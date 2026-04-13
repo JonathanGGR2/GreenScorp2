@@ -11500,95 +11500,239 @@
                 alert('PDF library not yet loaded. Please wait a moment and try again.');
                 return;
             }
+
+            // Strip characters jsPDF Helvetica cannot render
+            function ps(str) {
+                return String(str || '')
+                    .replace(/\u2264/g, '<=').replace(/\u2265/g, '>=')
+                    .replace(/\u2013/g, '-').replace(/\u2014/g, '--')
+                    .replace(/\u2018|\u2019/g, "'").replace(/\u201C|\u201D/g, '"')
+                    .replace(/[^\x20-\x7E]/g, '');
+            }
+
             var jsPDF = window.jspdf.jsPDF;
-            var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-            var m  = wulCurrentMeta;
-            var pw = 210, mg = 14, y = 18;
-            var cw = pw - mg * 2;
+            var doc   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            var m     = wulCurrentMeta;
+            var pw = 210, mg = 14, cw = 182, y = 15;
 
-            // Header bar
-            doc.setFillColor(44, 62, 80);
-            doc.rect(0, 0, pw, 14, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'bold');
-            doc.text('WUL COMPLIANCE ASSESSMENT REPORT', pw / 2, 9.5, { align: 'center' });
+            // ── LOGO ──────────────────────────────────────────────────────
+            if (typeof GSCP_LOGO_B64 !== 'undefined' && GSCP_LOGO_B64) {
+                try {
+                    doc.addImage(GSCP_LOGO_B64, 'JPEG', pw / 2 - 13, y, 26, 26);
+                    y += 30;
+                } catch(e) { y += 5; }
+            }
 
-            y = 22;
+            // ── TITLE BLOCK ───────────────────────────────────────────────
             doc.setTextColor(0, 0, 0);
-            doc.setFontSize(9);
             doc.setFont('helvetica', 'bold');
-            doc.text('Licence No.:', mg, y);       doc.setFont('helvetica', 'normal'); doc.text(m.licenceNo || 'N/A', mg + 28, y);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Facility:', mg + 85, y);     doc.setFont('helvetica', 'normal'); doc.text(m.facility || 'N/A', mg + 100, y);
-            y += 5.5;
-            doc.setFont('helvetica', 'bold');
-            doc.text('Date:', mg, y);              doc.setFont('helvetica', 'normal'); doc.text(m.date || 'N/A', mg + 28, y);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Assessed by:', mg + 85, y); doc.setFont('helvetica', 'normal'); doc.text(m.assessor || 'N/A', mg + 115, y);
+            doc.setFontSize(18);
+            doc.text('Green Scorpions Environmental Compliance Portal', pw / 2, y, { align: 'center' });
             y += 8;
-
-            // Table header
-            var cols = [55, 14, 28, 22, 20, 42]; // param, unit, limit, measured, exceed, status
-            var colX = [mg];
-            cols.forEach(function(w, i) { if (i > 0) colX.push(colX[i-1] + cols[i-1]); });
-            var hdrs = ['Parameter', 'Unit', 'WUL Limit', 'Measured', 'Exceed.', 'Status'];
-
-            doc.setFillColor(44, 62, 80);
-            doc.rect(mg, y, cw, 7, 'F');
-            doc.setTextColor(255,255,255);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(8);
-            hdrs.forEach(function(h, i) { doc.text(h, colX[i] + 1.5, y + 4.8); });
+            doc.setFontSize(13);
+            doc.text('Water Use Licence Compliance Assessment', pw / 2, y, { align: 'center' });
+            y += 6;
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(9);
+            doc.text('Developed by Dr. Jonathan Levin', pw / 2, y, { align: 'center' });
             y += 7;
 
+            // ── HORIZONTAL RULE ───────────────────────────────────────────
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.4);
+            doc.line(mg, y, pw - mg, y);
+            y += 6;
+
+            // ── LICENCE DETAILS ───────────────────────────────────────────
+            doc.setFillColor(232, 244, 251);
+            doc.setDrawColor(174, 214, 241);
+            doc.setLineWidth(0.3);
+            doc.rect(mg, y, cw, 18, 'FD');
+            var c1 = mg + 4, c2 = mg + 4 + cw / 2;
+            doc.setFontSize(8.5);
+            y += 5;
+            doc.setFont('helvetica', 'bold'); doc.setTextColor(26, 82, 118);
+            doc.text('WUL Number:', c1, y);
+            doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+            doc.text(ps(m.licenceNo) || 'Not specified', c1 + 30, y);
+            doc.setFont('helvetica', 'bold'); doc.setTextColor(26, 82, 118);
+            doc.text('Facility:', c2, y);
+            doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+            doc.text(ps(m.facility) || 'Not specified', c2 + 20, y);
+            y += 6;
+            doc.setFont('helvetica', 'bold'); doc.setTextColor(26, 82, 118);
+            doc.text('Assessment Date:', c1, y);
+            doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+            doc.text(ps(m.date) || 'Not specified', c1 + 40, y);
+            doc.setFont('helvetica', 'bold'); doc.setTextColor(26, 82, 118);
+            doc.text('Assessed by:', c2, y);
+            doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+            doc.text(ps(m.assessor) || 'Not specified', c2 + 30, y);
+            y += 11;
+
+            // ── TABLE HEADING ─────────────────────────────────────────────
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            doc.text('Compliance Assessment Results', mg, y);
+            y += 5;
+
+            // ── TABLE ─────────────────────────────────────────────────────
+            // cols: Parameter(54) | Unit(16) | WUL Limit(28) | Measured(24) | Exceedance(22) | Status(38)
+            var cols = [54, 16, 28, 24, 22, 38];
+            var colX = [mg];
+            cols.forEach(function(w, i) { if (i > 0) colX.push(colX[i-1] + cols[i-1]); });
+            var rh = 8;
+
+            // Header row
+            doc.setFillColor(44, 62, 80);
+            doc.rect(mg, y, cw, rh, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            var hdrs = ['Parameter', 'Unit', 'WUL Limit', 'Measured', 'Exceedance', 'Status'];
+            hdrs.forEach(function(h, i) { doc.text(h, colX[i] + 2, y + 5.2); });
+            // vertical dividers in header
+            doc.setDrawColor(80, 100, 120);
+            doc.setLineWidth(0.2);
+            for (var ci = 1; ci < colX.length; ci++) {
+                doc.line(colX[ci], y, colX[ci], y + rh);
+            }
+            y += rh;
+
+            // Data rows
             doc.setFont('helvetica', 'normal');
-            wulCurrentResults.forEach(function(r) {
-                var rh = 7;
+            wulCurrentResults.forEach(function(r, ri) {
                 var rc = r.compliance.code;
-                if (rc === 'ok')   doc.setFillColor(212,237,218);
-                else if (rc === 'warn') doc.setFillColor(255,243,205);
-                else if (rc === 'fail') doc.setFillColor(248,215,218);
-                else               doc.setFillColor(240,240,240);
-                doc.rect(mg, y, cw, rh, 'F');
-                doc.setTextColor(0,0,0);
+
+                // White base row with border
+                doc.setFillColor(255, 255, 255);
+                doc.setDrawColor(180, 180, 180);
+                doc.setLineWidth(0.15);
+                doc.rect(mg, y, cw, rh, 'FD');
+
+                // Column dividers (full row)
+                doc.setDrawColor(200, 200, 200);
+                for (var ci2 = 1; ci2 < colX.length; ci2++) {
+                    doc.line(colX[ci2], y, colX[ci2], y + rh);
+                }
+
+                // Color ONLY the Measured cell (col index 3)
+                if (r.measured !== null && !isNaN(r.measured)) {
+                    if      (rc === 'ok')   doc.setFillColor(212, 237, 218);
+                    else if (rc === 'warn') doc.setFillColor(255, 243, 205);
+                    else if (rc === 'fail') doc.setFillColor(248, 215, 218);
+                    else                   doc.setFillColor(240, 240, 240);
+                    doc.rect(colX[3], y, cols[3], rh, 'F');
+                    // redraw dividers around coloured cell
+                    doc.setDrawColor(200, 200, 200);
+                    doc.line(colX[3], y, colX[3], y + rh);
+                    doc.line(colX[4], y, colX[4], y + rh);
+                }
+
+                // Alternate light grey for odd rows (non-measured cells only)
+                if (ri % 2 !== 0) {
+                    doc.setFillColor(248, 249, 250);
+                    // Parameter col
+                    doc.rect(colX[0], y, cols[0], rh, 'F');
+                    // Unit
+                    doc.rect(colX[1], y, cols[1], rh, 'F');
+                    // Limit
+                    doc.rect(colX[2], y, cols[2], rh, 'F');
+                    // Exceedance
+                    doc.rect(colX[4], y, cols[4], rh, 'F');
+                    // Status
+                    doc.rect(colX[5], y, cols[5], rh, 'F');
+                    // redraw dividers
+                    doc.setDrawColor(200, 200, 200);
+                    for (var ci3 = 1; ci3 < colX.length; ci3++) {
+                        doc.line(colX[ci3], y, colX[ci3], y + rh);
+                    }
+                }
+
+                // Cell text
+                doc.setTextColor(0, 0, 0);
                 doc.setFontSize(7.5);
-                var excDisp = r.compliance.excPct !== null ? ((r.compliance.deficit ? '-' : '+') + r.compliance.excPct + '%') : '—';
-                var measDisp = (r.measured !== null && !isNaN(r.measured)) ? String(r.measured) : '—';
-                var statShort = rc === 'ok' ? 'COMPLIANT' : rc === 'warn' ? 'WARNING' : rc === 'fail' ? 'NON-COMPLIANT' : 'N/M';
-                var cells = [r.name, r.unit || '—', r.limitDisp, measDisp, excDisp, statShort];
-                cells.forEach(function(c, i) {
-                    doc.text(String(c).substring(0, i === 0 ? 28 : 18), colX[i] + 1.5, y + 4.8);
-                });
+                var excDisp  = (r.compliance.excPct !== null && r.compliance.excPct !== undefined)
+                             ? ((r.compliance.deficit ? '-' : '+') + r.compliance.excPct + '%') : '-';
+                var measDisp = (r.measured !== null && !isNaN(r.measured)) ? String(r.measured) : 'N/M';
+                var limClean = ps(r.limitDisp);
+                var statTxt  = rc === 'ok' ? 'COMPLIANT' : rc === 'warn' ? 'WARNING' : rc === 'fail' ? 'NON-COMPLIANT' : 'NOT MEASURED';
+
+                // Bold non-compliant parameter names
+                if (rc === 'fail') doc.setFont('helvetica', 'bold');
+                else               doc.setFont('helvetica', 'normal');
+                doc.text(ps(r.name).substring(0, 27), colX[0] + 2, y + 5.2);
+                doc.setFont('helvetica', 'normal');
+                doc.text(ps(r.unit || '-').substring(0, 8), colX[1] + 2, y + 5.2);
+                doc.text(limClean.substring(0, 14), colX[2] + 2, y + 5.2);
+
+                // Measured value — coloured text to match cell shade
+                if      (rc === 'ok')   doc.setTextColor(21, 87, 36);
+                else if (rc === 'warn') doc.setTextColor(133, 100, 4);
+                else if (rc === 'fail') doc.setTextColor(114, 28, 36);
+                else                   doc.setTextColor(80, 80, 80);
+                doc.setFont('helvetica', 'bold');
+                doc.text(measDisp.substring(0, 12), colX[3] + 2, y + 5.2);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(0, 0, 0);
+
+                doc.text(excDisp.substring(0, 10), colX[4] + 2, y + 5.2);
+                doc.text(statTxt.substring(0, 18), colX[5] + 2, y + 5.2);
+
                 y += rh;
-                if (y > 265) { doc.addPage(); y = 14; }
+                if (y > 260) { doc.addPage(); y = 18; }
             });
 
-            // Summary line
+            // Bottom rule of table
+            doc.setDrawColor(100, 120, 140);
+            doc.setLineWidth(0.4);
+            doc.line(mg, y, pw - mg, y);
             y += 5;
+
+            // ── SUMMARY LINE ─────────────────────────────────────────────
             var nF = wulCurrentResults.filter(function(r){ return r.compliance.code === 'fail'; }).length;
             var nW = wulCurrentResults.filter(function(r){ return r.compliance.code === 'warn'; }).length;
-            doc.setFontSize(9); doc.setFont('helvetica', 'bold');
-            doc.text('Summary: ' + wulCurrentResults.length + ' parameters assessed | ' + nF + ' non-compliant | ' + nW + ' warning | ' + (wulCurrentResults.length - nF - nW) + ' compliant', mg, y);
-            y += 8;
+            var nO = wulCurrentResults.filter(function(r){ return r.compliance.code === 'ok'; }).length;
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+            doc.text(wulCurrentResults.length + ' parameters assessed  |', mg, y);
+            doc.setTextColor(30, 132, 73);  doc.text('Compliant: ' + nO, mg + 62, y);
+            doc.setTextColor(183, 119, 13); doc.text('Warning: ' + nW, mg + 95, y);
+            doc.setTextColor(192, 57, 43);  doc.text('Non-compliant: ' + nF, mg + 120, y);
+            y += 9;
 
-            // Findings
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-            doc.text('Major Findings:', mg, y); y += 5;
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-            var findEl = document.getElementById('wulFindingsText');
-            var findTxt = findEl ? findEl.innerText : '';
-            var lines = doc.splitTextToSize(findTxt, cw);
+            // ── SEPARATOR ────────────────────────────────────────────────
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.3);
+            doc.line(mg, y - 2, pw - mg, y - 2);
+
+            // ── MAJOR FINDINGS ────────────────────────────────────────────
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            doc.text('Major Findings:', mg, y + 3);
+            y += 9;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8.5);
+            var findEl  = document.getElementById('wulFindingsText');
+            var rawTxt  = findEl ? findEl.innerText : '';
+            var findTxt = ps(rawTxt);
+            var lines   = doc.splitTextToSize(findTxt, cw);
             lines.forEach(function(ln) {
-                doc.text(ln, mg, y); y += 4.5;
-                if (y > 275) { doc.addPage(); y = 14; }
+                doc.setTextColor(50, 50, 50);
+                doc.text(ln, mg, y);
+                y += 4.8;
+                if (y > 275) { doc.addPage(); y = 18; }
             });
 
-            // Footer
-            doc.setFontSize(7); doc.setTextColor(150,150,150);
-            doc.text('Green Scorpions Environmental Compliance Portal | DFFE', pw/2, 292, { align: 'center' });
+            // ── FOOTER ────────────────────────────────────────────────────
+            doc.setFontSize(7);
+            doc.setTextColor(160, 160, 160);
+            doc.text('Green Scorpions Environmental Compliance Portal  |  DFFE Green Scorpions Unit  |  ' + (m.date || ''), pw / 2, 292, { align: 'center' });
 
-            var fname = 'WUL_Compliance_' + (m.facility || 'Assessment').replace(/\s+/g, '_') + '_' + (m.date || 'date') + '.pdf';
+            var fname = 'WUL_Compliance_' + ps(m.facility || 'Assessment').replace(/\s+/g, '_') + '_' + (m.date || 'date') + '.pdf';
             doc.save(fname);
         }
 
