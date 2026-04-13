@@ -16,6 +16,8 @@
     
     <!-- Turf.js for geospatial calculations -->
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <!-- docx.js for Word document export -->
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"></script>
     
     <style>
         * {
@@ -1128,6 +1130,7 @@
                 <button class="nav-btn" onclick="showSection('water')">💧 Water Quality</button>
                 <button class="nav-btn" onclick="showSection('marine')">🌊 Marine & Estuarine</button>
                 <button class="nav-btn" onclick="showSection('field')">📍 Field Data Collection</button>
+                <button class="nav-btn" onclick="showSection('review')">📋 Field Review</button>
             </div>
             <div class="user-info">
                 <span id="userDisplay">Welcome, User</span> |
@@ -1246,6 +1249,12 @@
                         <p style="opacity: 0.9; margin-bottom: 25px; line-height: 1.6;">Mobile-friendly field data capture tool. Record GPS coordinates, parameters, photos, and notes. Works offline!</p>
                         <button onclick="showSection('field')" style="background: rgba(255,255,255,0.2); color: white; border: none; padding: 15px 30px; border-radius: 10px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">Launch Tool</button>
                     </div>
+                    <div style="background: linear-gradient(135deg, #1a3c2a, #2c5530); color: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 15px 35px rgba(26, 60, 42, 0.3); transition: transform 0.3s ease;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                        <div style="font-size: 4rem; margin-bottom: 20px;">📋</div>
+                        <h3 style="font-size: 1.8rem; margin-bottom: 15px;">Field Data Review</h3>
+                        <p style="opacity: 0.9; margin-bottom: 25px; line-height: 1.6;">Desktop review tool for field session data. Upload your JSON, inspect all sites, and export professional Word reports with watermarked photos.</p>
+                        <button onclick="showSection('review')" style="background: rgba(255,255,255,0.2); color: white; border: none; padding: 15px 30px; border-radius: 10px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">Launch Tool</button>
+                    </div>
                 </div>
 
                 <div style="background: linear-gradient(135deg, #f8f9fa, #e9ecef); border-radius: 15px; padding: 30px; margin-top: 40px; text-align: center;">
@@ -1287,6 +1296,10 @@
             <div id="fieldSection" class="tool-content">
                 <div id="fieldToolContainer"></div>
             </div>
+            <!-- FIELD DATA REVIEW TOOL SECTION -->
+            <div id="reviewSection" class="tool-content">
+                <div id="reviewToolContainer" style="padding:30px;"></div>
+            </div>
         </div>
     </div>
 
@@ -1302,7 +1315,7 @@
         };
 
         let currentUser = null;
-        let toolsLoaded = { sediment: false, water: false, marine: false, field: false };
+        let toolsLoaded = { sediment: false, water: false, marine: false, field: false, review: false };
         
         // Water Tool Variables
         let waterSampleCounter = 0;
@@ -1589,11 +1602,9 @@
             }
             
             // Set active button
-            const targetButton = [...document.querySelectorAll('.nav-btn')].find(btn => 
-                btn.textContent.includes(sectionName === 'dashboard' ? 'Dashboard' : 
-                                       sectionName === 'sediment' ? 'Sediment' : 
-                                       sectionName === 'water' ? 'Water' : 
-                                       sectionName === 'marine' ? 'Marine' : 'Field')
+            const _btnMap = { dashboard:'Dashboard', sediment:'Sediment', water:'Water', marine:'Marine', field:'Field', review:'Field Review' };
+            const targetButton = [...document.querySelectorAll('.nav-btn')].find(btn =>
+                btn.textContent.trim().includes(_btnMap[sectionName] || sectionName)
             );
             if (targetButton) {
                 targetButton.classList.add('active');
@@ -1611,6 +1622,9 @@
             } else if (sectionName === 'field' && !toolsLoaded.field) {
                 loadFieldTool();
                 toolsLoaded.field = true;
+            } else if (sectionName === 'review' && !toolsLoaded.review) {
+                loadReviewTool();
+                toolsLoaded.review = true;
             }
         }
 
@@ -10381,6 +10395,348 @@
             if (banner) banner.remove();
         }
 
+
+
+        // ════════════════════════════════════════════════════════════════════
+        // FIELD DATA REVIEW TOOL
+        // ════════════════════════════════════════════════════════════════════
+
+        var reviewData = null;
+
+        function loadReviewTool() {
+            var container = document.getElementById('reviewToolContainer');
+            container.style.padding = '0';
+            container.innerHTML =
+                '<div style="background:linear-gradient(135deg,#1a3c2a 0%,#2c5530 100%);color:white;padding:26px 30px 20px;margin:0 0 0 0;">'
+                + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">'
+                + '<div style="font-size:2rem;">📋</div>'
+                + '<div><h1 style="font-size:1.55rem;font-weight:700;margin:0 0 3px;">Field Data Review</h1>'
+                + '<p style="font-size:0.83rem;opacity:0.85;margin:0;">Desktop report tool — upload a field session JSON, inspect all sites, and export Word reports</p></div>'
+                + '</div></div>'
+                + '<div style="padding:24px 28px;">'
+                + '<div style="background:#f4f6f8;border:2px dashed #aed6f1;border-radius:14px;padding:28px;text-align:center;margin-bottom:20px;">'
+                + '<div style="font-size:2.6rem;margin-bottom:10px;">📂</div>'
+                + '<p style="font-weight:700;color:#1a3c2a;font-size:1rem;margin-bottom:5px;">Upload Field Session JSON</p>'
+                + '<p style="font-size:0.83rem;color:#777;margin-bottom:16px;">Export file from the Field Data Collection tool — single site or all-sites JSON</p>'
+                + '<input type="file" id="reviewFileInput" accept=".json" onchange="handleReviewUpload(event)" style="display:none;">'
+                + '<button onclick="document.getElementById(\'reviewFileInput\').click()" style="padding:11px 26px;background:linear-gradient(135deg,#2c5530,#4a9960);color:white;border:none;border-radius:10px;font-size:0.97rem;font-weight:700;cursor:pointer;">Choose JSON File</button>'
+                + '<div id="reviewUploadStatus" style="margin-top:10px;font-size:0.87rem;color:#555;min-height:18px;"></div>'
+                + '</div>'
+                + '<div id="reviewContent" style="display:none;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:2px solid #eee;">'
+                + '<div id="reviewSummary" style="font-size:0.93rem;color:#2c3e50;font-weight:600;"></div>'
+                + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+                + '<button onclick="exportAllDocx()" style="padding:9px 18px;background:linear-gradient(135deg,#1a3c2a,#2c5530);color:white;border:none;border-radius:9px;font-size:0.9rem;font-weight:700;cursor:pointer;">📄 Export All Sites — Word Doc</button>'
+                + '<button onclick="clearReviewData()" style="padding:9px 14px;background:#c0392b;color:white;border:none;border-radius:9px;font-size:0.87rem;font-weight:700;cursor:pointer;">✕ Clear</button>'
+                + '</div></div>'
+                + '<div id="reviewSiteCards"></div>'
+                + '</div>'
+                + '</div>';
+        }
+
+        function handleReviewUpload(event) {
+            var file = event.target.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var data = JSON.parse(e.target.result);
+                    if (!data.sites || !data.sites.length) throw new Error('No site data found in this file.');
+                    reviewData = data;
+                    document.getElementById('reviewUploadStatus').innerHTML =
+                        '<span style="color:#1e8449;font-weight:600;">✅ ' + data.sites.length + ' site(s) loaded from ' + file.name + '</span>';
+                    renderReview();
+                } catch(err) {
+                    document.getElementById('reviewUploadStatus').innerHTML =
+                        '<span style="color:#c0392b;font-weight:600;">❌ ' + err.message + '</span>';
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function renderReview() {
+            if (!reviewData) return;
+            var sites = reviewData.sites;
+            document.getElementById('reviewContent').style.display = 'block';
+            var exportDate = reviewData.exportDate ? new Date(reviewData.exportDate).toLocaleDateString('en-ZA') : '';
+            var by = reviewData.exportedBy ? ' by ' + reviewData.exportedBy : '';
+            document.getElementById('reviewSummary').textContent =
+                sites.length + ' site(s) loaded' + (exportDate ? ' — exported ' + exportDate + by : '');
+
+            var container = document.getElementById('reviewSiteCards');
+            container.innerHTML = '';
+
+            sites.forEach(function(site, idx) {
+                var card = document.createElement('div');
+                card.style.cssText = 'background:white;border:2px solid #dde2e8;border-radius:14px;margin-bottom:18px;overflow:hidden;box-shadow:0 3px 12px rgba(0,0,0,0.07);';
+
+                var lat  = (site.gps && site.gps.latitude)  ? parseFloat(site.gps.latitude).toFixed(5)  : '—';
+                var lon  = (site.gps && site.gps.longitude) ? parseFloat(site.gps.longitude).toFixed(5) : '—';
+                var dt   = site.datetime ? site.datetime.replace('T','  ') : '—';
+                var name = site.siteName || ('Site ' + site.siteNumber);
+                var pc   = (site.photos     || []).length;
+                var prmc = (site.parameters || []).length;
+
+                var paramsHTML = '';
+                if (site.parameters && site.parameters.length) {
+                    paramsHTML = '<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:0.86rem;">'
+                        + '<tr style="background:#eaf4fb;">'
+                        + '<th style="padding:6px 10px;text-align:left;border-bottom:2px solid #aed6f1;">Parameter</th>'
+                        + '<th style="padding:6px 10px;text-align:left;border-bottom:2px solid #aed6f1;">Value</th>'
+                        + '<th style="padding:6px 10px;text-align:left;border-bottom:2px solid #aed6f1;">Unit</th>'
+                        + '<th style="padding:6px 10px;text-align:left;border-bottom:2px solid #aed6f1;">Note</th></tr>';
+                    site.parameters.forEach(function(p) {
+                        paramsHTML += '<tr style="border-bottom:1px solid #eee;">'
+                            + '<td style="padding:5px 10px;font-weight:600;color:#2c3e50;">' + (p.name || p.parameter) + '</td>'
+                            + '<td style="padding:5px 10px;color:#1e8449;font-weight:700;">' + p.value + '</td>'
+                            + '<td style="padding:5px 10px;color:#555;">' + (p.unit || '') + '</td>'
+                            + '<td style="padding:5px 10px;color:#777;font-style:italic;">' + (p.note || '') + '</td></tr>';
+                    });
+                    paramsHTML += '</table>';
+                }
+
+                var photosHTML = '';
+                if (site.photos && site.photos.length) {
+                    photosHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:8px;">';
+                    site.photos.forEach(function(src) {
+                        photosHTML += '<img src="' + src + '" style="width:100%;border-radius:8px;border:1px solid #dde2e8;">';
+                    });
+                    photosHTML += '</div>';
+                }
+
+                card.innerHTML =
+                    '<div style="background:linear-gradient(135deg,#1a3c2a,#2c5530);color:white;padding:13px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+                    + '<div><span style="font-weight:700;font-size:1.02rem;">Site ' + site.siteNumber + ': ' + name + '</span>'
+                    + '<div style="font-size:0.79rem;opacity:0.82;margin-top:2px;">' + dt + ' &nbsp;&middot;&nbsp; ' + prmc + ' parameter(s) &nbsp;&middot;&nbsp; ' + pc + ' photo(s)</div></div>'
+                    + '<button onclick="exportSiteDocx(' + idx + ')" style="padding:6px 15px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:8px;font-weight:700;font-size:0.8rem;cursor:pointer;">📄 Export This Site</button>'
+                    + '</div>'
+                    + '<div style="padding:14px 18px;">'
+                    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;font-size:0.86rem;">'
+                    + '<div><span style="color:#888;font-size:0.76rem;display:block;">GPS (DD)</span><strong>' + lat + ',  ' + lon + '</strong></div>'
+                    + '<div><span style="color:#888;font-size:0.76rem;display:block;">Date / Time</span><strong>' + dt + '</strong></div>'
+                    + '</div>'
+                    + (site.fieldNotes ? '<div style="background:#f9fafb;border-left:3px solid #4a9960;padding:9px 13px;border-radius:0 7px 7px 0;margin-bottom:12px;font-size:0.86rem;color:#333;"><span style="font-weight:700;display:block;margin-bottom:3px;font-size:0.76rem;color:#888;">FIELD NOTES</span>' + site.fieldNotes + '</div>' : '')
+                    + (prmc ? '<div style="margin-bottom:12px;"><span style="font-weight:700;font-size:0.76rem;color:#888;display:block;margin-bottom:4px;">PARAMETERS</span>' + paramsHTML + '</div>' : '')
+                    + (pc   ? '<div><span style="font-weight:700;font-size:0.76rem;color:#888;display:block;margin-bottom:4px;">PHOTOGRAPHS (' + pc + ')</span>' + photosHTML + '</div>' : '')
+                    + '</div>';
+
+                container.appendChild(card);
+            });
+        }
+
+        function clearReviewData() {
+            reviewData = null;
+            document.getElementById('reviewContent').style.display = 'none';
+            document.getElementById('reviewUploadStatus').textContent = '';
+            document.getElementById('reviewFileInput').value = '';
+            document.getElementById('reviewSiteCards').innerHTML = '';
+        }
+
+        // ── DOCX EXPORT ─────────────────────────────────────────────────────
+
+        function base64ToUint8Array(b64) {
+            var raw = b64.includes(',') ? b64.split(',')[1] : b64;
+            var binary = atob(raw);
+            var arr = new Uint8Array(binary.length);
+            for (var i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+            return arr;
+        }
+
+        function getImageDims(src) {
+            return new Promise(function(resolve) {
+                var img = new Image();
+                img.onload  = function() { resolve({ w: img.naturalWidth,  h: img.naturalHeight }); };
+                img.onerror = function() { resolve({ w: 500, h: 375 }); };
+                img.src = src;
+            });
+        }
+
+        function exportSiteDocx(siteIndex) {
+            if (!reviewData) return;
+            var site = reviewData.sites[siteIndex];
+            var fname = 'GSCP_Field_Site' + site.siteNumber
+                + (site.siteName ? '_' + site.siteName.replace(/[^a-zA-Z0-9]/g,'_') : '')
+                + '_' + new Date().toISOString().split('T')[0] + '.docx';
+            buildAndDownloadDocx([site], fname, false);
+        }
+
+        function exportAllDocx() {
+            if (!reviewData || !reviewData.sites.length) return;
+            var fname = 'GSCP_Field_AllSites_' + new Date().toISOString().split('T')[0] + '.docx';
+            buildAndDownloadDocx(reviewData.sites, fname, true);
+        }
+
+        async function buildAndDownloadDocx(sites, filename, includeCover) {
+            if (typeof docx === 'undefined') {
+                alert('Word document library is still loading. Please wait a moment and try again.');
+                return;
+            }
+
+            var D = docx;
+            var PAGE_W  = 11906;
+            var MARGIN  = 1440;
+            var CONT_W  = PAGE_W - MARGIN * 2;
+
+            var bGrey = { style: D.BorderStyle.SINGLE, size: 1, color: 'CCCCCC' };
+            var bNone = { style: D.BorderStyle.NONE,   size: 0, color: 'FFFFFF' };
+            var bAll  = { top: bGrey, bottom: bGrey, left: bGrey, right: bGrey };
+            var bNone4 = { top: bNone, bottom: bNone, left: bNone, right: bNone };
+            var cPad  = { top: 80, bottom: 80, left: 120, right: 120 };
+
+            function mkCell(text, widthDxa, bgFill, bold, color) {
+                return new D.TableCell({
+                    borders: bAll, margins: cPad,
+                    width: { size: widthDxa, type: D.WidthType.DXA },
+                    shading: { fill: bgFill || 'FFFFFF', type: D.ShadingType.CLEAR },
+                    children: [new D.Paragraph({ children: [
+                        new D.TextRun({ text: text || '', bold: !!bold, size: 19, font: 'Arial', color: color || '222222' })
+                    ]})]
+                });
+            }
+
+            function labelRow(label, value) {
+                return new D.TableRow({ children: [
+                    mkCell(label, 2500, 'E8F5E9', true, '1A3C2A'),
+                    mkCell(value, CONT_W - 2500, 'FFFFFF', false, '222222')
+                ]});
+            }
+
+            function sectionHead(text) {
+                return new D.Paragraph({
+                    spacing: { before: 280, after: 100 },
+                    border: { bottom: { style: D.BorderStyle.SINGLE, size: 6, color: '2C5530', space: 1 } },
+                    children: [new D.TextRun({ text: text, bold: true, size: 26, color: '1A3C2A', font: 'Arial' })]
+                });
+            }
+
+            var all = [];
+
+            // ── COVER ──────────────────────────────────────────────────────
+            if (includeCover) {
+                try {
+                    all.push(new D.Paragraph({
+                        alignment: D.AlignmentType.CENTER,
+                        spacing: { before: 600, after: 300 },
+                        children: [new D.ImageRun({ data: base64ToUint8Array(GSCP_LOGO_B64), transformation: { width: 120, height: 100 }, type: 'jpg' })]
+                    }));
+                } catch(e) {}
+                all.push(new D.Paragraph({ alignment: D.AlignmentType.CENTER, spacing: { before: 0, after: 140 },
+                    children: [new D.TextRun({ text: 'GREEN SCORPIONS ENVIRONMENTAL COMPLIANCE PORTAL', bold: true, size: 30, color: '1A3C2A', font: 'Arial' })] }));
+                all.push(new D.Paragraph({ alignment: D.AlignmentType.CENTER, spacing: { before: 0, after: 600 },
+                    children: [new D.TextRun({ text: 'Field Investigation Report', size: 24, color: '666666', font: 'Arial', italics: true })] }));
+
+                var exportDateStr = reviewData && reviewData.exportDate
+                    ? new Date(reviewData.exportDate).toLocaleDateString('en-ZA', { day:'2-digit', month:'long', year:'numeric' })
+                    : new Date().toLocaleDateString('en-ZA', { day:'2-digit', month:'long', year:'numeric' });
+
+                all.push(new D.Table({ width: { size: CONT_W, type: D.WidthType.DXA }, columnWidths: [2500, CONT_W - 2500], rows: [
+                    labelRow('Generated by', (reviewData && reviewData.exportedBy) || currentUser || 'Green Scorpions EMI'),
+                    labelRow('Report date',  exportDateStr),
+                    labelRow('Total sites',  String(sites.length)),
+                    labelRow('Site names',   sites.map(function(s){ return s.siteName || 'Site ' + s.siteNumber; }).join(', ')),
+                ]}));
+                all.push(new D.Paragraph({ children: [new D.PageBreak()] }));
+            }
+
+            // ── PER-SITE ───────────────────────────────────────────────────
+            for (var si = 0; si < sites.length; si++) {
+                var site = sites[si];
+                if (si > 0) all.push(new D.Paragraph({ children: [new D.PageBreak()] }));
+
+                var sname = site.siteName || ('Site ' + site.siteNumber);
+                var lat   = (site.gps && site.gps.latitude)  ? parseFloat(site.gps.latitude).toFixed(5)  : 'Not recorded';
+                var lon   = (site.gps && site.gps.longitude) ? parseFloat(site.gps.longitude).toFixed(5) : 'Not recorded';
+                var dt    = site.datetime ? site.datetime.replace('T','  ') : 'Not recorded';
+
+                all.push(sectionHead('Site ' + site.siteNumber + ':  ' + sname));
+
+                all.push(new D.Table({ width: { size: CONT_W, type: D.WidthType.DXA }, columnWidths: [2500, CONT_W - 2500], rows: [
+                    labelRow('Site name',    sname),
+                    labelRow('GPS (DD)',     lat + ',  ' + lon),
+                    labelRow('Date / Time',  dt),
+                    labelRow('Sampled by',   (reviewData && reviewData.exportedBy) || currentUser || 'Green Scorpions EMI'),
+                ]}));
+
+                // Field notes
+                if (site.fieldNotes && site.fieldNotes.trim()) {
+                    all.push(new D.Paragraph({ spacing: { before: 220, after: 80 },
+                        children: [new D.TextRun({ text: 'Field Notes', bold: true, size: 22, color: '1A3C2A', font: 'Arial' })] }));
+                    all.push(new D.Paragraph({ spacing: { before: 0, after: 180 },
+                        children: [new D.TextRun({ text: site.fieldNotes, size: 20, font: 'Arial', italics: true, color: '333333' })] }));
+                }
+
+                // Parameters table
+                if (site.parameters && site.parameters.length) {
+                    all.push(new D.Paragraph({ spacing: { before: 220, after: 80 },
+                        children: [new D.TextRun({ text: 'Field Parameters', bold: true, size: 22, color: '1A3C2A', font: 'Arial' })] }));
+
+                    var cw = [3800, 1800, CONT_W - 5600];
+                    var pRows = [new D.TableRow({ children: [
+                        mkCell('Parameter', cw[0], '1A3C2A', true, 'FFFFFF'),
+                        mkCell('Value',     cw[1], '1A3C2A', true, 'FFFFFF'),
+                        mkCell('Unit / Note', cw[2], '1A3C2A', true, 'FFFFFF'),
+                    ]})];
+
+                    site.parameters.forEach(function(p, pi) {
+                        var bg = pi % 2 === 0 ? 'FFFFFF' : 'F2F9F2';
+                        pRows.push(new D.TableRow({ children: [
+                            mkCell(p.name || p.parameter, cw[0], bg, false, '2C3E50'),
+                            mkCell(String(p.value),       cw[1], bg, true,  '1E8449'),
+                            mkCell((p.unit || '') + (p.note ? '  (' + p.note + ')' : ''), cw[2], bg, false, '555555'),
+                        ]}));
+                    });
+
+                    all.push(new D.Table({ width: { size: CONT_W, type: D.WidthType.DXA }, columnWidths: cw, rows: pRows }));
+                }
+
+                // Photos
+                if (site.photos && site.photos.length) {
+                    all.push(new D.Paragraph({ spacing: { before: 220, after: 80 },
+                        children: [new D.TextRun({ text: 'Site Photographs (' + site.photos.length + ')', bold: true, size: 22, color: '1A3C2A', font: 'Arial' })] }));
+
+                    for (var pi2 = 0; pi2 < site.photos.length; pi2++) {
+                        try {
+                            var dims  = await getImageDims(site.photos[pi2]);
+                            var maxW  = 500;
+                            var sc    = Math.min(1, maxW / dims.w);
+                            var dW    = Math.round(dims.w * sc);
+                            var dH    = Math.round(dims.h * sc);
+                            var imgBuf = base64ToUint8Array(site.photos[pi2]);
+                            all.push(new D.Paragraph({ alignment: D.AlignmentType.CENTER, spacing: { before: 100, after: 80 },
+                                children: [new D.ImageRun({ data: imgBuf, transformation: { width: dW, height: dH }, type: 'jpg' })] }));
+                            all.push(new D.Paragraph({ alignment: D.AlignmentType.CENTER, spacing: { before: 0, after: 160 },
+                                children: [new D.TextRun({ text: 'Figure ' + (pi2 + 1) + ':  ' + sname + '  |  ' + dt, size: 17, italics: true, color: '888888', font: 'Arial' })] }));
+                        } catch(e2) { /* skip unreadable photo */ }
+                    }
+                }
+            }
+
+            // ── FOOTER LINE ────────────────────────────────────────────────
+            all.push(new D.Paragraph({ spacing: { before: 480 },
+                border: { top: { style: D.BorderStyle.SINGLE, size: 4, color: '2C5530', space: 1 } },
+                children: [new D.TextRun({ text: 'Green Scorpions Environmental Compliance Portal  |  Dr. Jonathan Levin  |  ' + new Date().toLocaleDateString('en-ZA', { day:'2-digit', month:'long', year:'numeric' }),
+                    size: 16, color: '999999', font: 'Arial' })] }));
+
+            // ── BUILD ──────────────────────────────────────────────────────
+            var doc = new D.Document({
+                styles: { default: { document: { run: { font: 'Arial', size: 20 } } } },
+                sections: [{ properties: { page: {
+                    size:   { width: PAGE_W, height: 16838 },
+                    margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN }
+                }}, children: all }]
+            });
+
+            try {
+                var blob = await D.Packer.toBlob(doc);
+                var url  = URL.createObjectURL(blob);
+                var a    = document.createElement('a');
+                a.href = url; a.download = filename; a.click();
+                URL.revokeObjectURL(url);
+            } catch(err) {
+                alert('Export failed: ' + err.message);
+                console.error(err);
+            }
+        }
 
         // Initialize app when page loads
     </script>
