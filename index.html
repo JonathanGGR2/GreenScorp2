@@ -1359,7 +1359,9 @@
             ammonium: { twqr: 0.5, cev: 1.0, aev: 2.0 },
             ammonia_unionized: { twqr: 0.007, cev: 0.015, aev: 0.100 },
             nitrate: { twqr: 6.0, cev: 12.0, aev: 20.0 },
-            nitrite: { twqr: 0.9, cev: 1.8, aev: 5.0 }
+            nitrite: { twqr: 0.9, cev: 1.8, aev: 5.0 },
+            // DWAF (1996) Volume 2: Recreational Use — E. coli thresholds
+            ecoli:   { twqr: 500,  cev: 1000, aev: 2000 }
         };
 
         // Water quality guidelines for unionized NH3 in mg/L-N
@@ -1391,7 +1393,8 @@
             ammonium: { name: 'Ammonium (NH₄⁺)', unit: 'mg N/L', step: '0.001', placeholder: '0.500' },
             ammonia_unionized: { name: 'Ammonia (NH₃) Unionized', unit: 'mg N/L', step: '0.0001', placeholder: '0.007' },
             nitrate: { name: 'Nitrate (NO₃⁻)', unit: 'mg N/L', step: '0.01', placeholder: '6.0' },
-            nitrite: { name: 'Nitrite (NO₂⁻)', unit: 'mg N/L', step: '0.001', placeholder: '0.9' }
+            nitrite: { name: 'Nitrite (NO₂⁻)', unit: 'mg N/L', step: '0.001', placeholder: '0.9' },
+            ecoli:   { name: 'E. coli',           unit: 'CFU/100mL', step: '1', placeholder: '500' }
         };
 
         // South African Soil Screening Values (from Government Gazette No. 36447, 2013)
@@ -1778,6 +1781,10 @@
                                     <div class="input-field">
                                         <label for="numSedimentSamplingEvents"><strong>Number of Sampling Events:</strong></label>
                                         <input type="number" id="numSedimentSamplingEvents" min="2" max="20" placeholder="e.g., 3" style="padding: 12px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; width: 100%;">
+                                    </div>
+                                    <div class="input-field">
+                                        <label for="sedimentMonitoringSiteName"><strong>Site Name:</strong></label>
+                                        <input type="text" id="sedimentMonitoringSiteName" placeholder="e.g., Olifantsfontein — Tailings" style="padding: 12px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; width: 100%;">
                                     </div>
                                 </div>
 
@@ -2609,6 +2616,7 @@
                     <button class="water-nav-btn active" onclick="showWaterSection('assessment')">🧪 Assessment</button>
                     <button class="water-nav-btn" onclick="showWaterSection('monitoring')">📍 Single Site Monitoring</button>
                     <button class="water-nav-btn" onclick="showWaterSection('river-continuum')">🗺️ River Continuum Monitoring</button>
+                    <button class="water-nav-btn" onclick="showWaterSection('wul-compliance')">🏛️ WUL Compliance</button>
                 </div>
 
                 <div id="waterContentArea" style="margin-top: 20px;">
@@ -2698,12 +2706,18 @@
                                             <option value="ammonium">Ammonium (NH₄⁺) - mg N/L</option>
                                             <option value="nitrate">Nitrate (NO₃⁻) - mg N/L</option>
                                             <option value="nitrite">Nitrite (NO₂⁻) - mg N/L</option>
+                                            <optgroup label="─── Microbiology (DWAF 1996, Vol. 2) ───"></optgroup>
+                                            <option value="ecoli">E. coli — Recreational Use - CFU/100mL</option>
                                         </select>
                                     </div>
 
                                     <div class="input-field">
                                         <label for="numSamplingEvents"><strong>Number of Sampling Events:</strong></label>
                                         <input type="number" id="numSamplingEvents" min="2" max="20" placeholder="e.g., 3" style="padding: 12px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; width: 100%;">
+                                    </div>
+                                    <div class="input-field">
+                                        <label for="monitoringSiteName"><strong>Site Name:</strong></label>
+                                        <input type="text" id="monitoringSiteName" placeholder="e.g., Black River — NR06" style="padding: 12px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; width: 100%;">
                                     </div>
                                 </div>
 
@@ -2963,8 +2977,10 @@
                             </div>
                         </div>
                     </div>
+                    <div id="water-wul-compliance" class="water-section"></div>
                 </div>
             `;
+            initWulSection();
         }
 
         function addWaterSample() {
@@ -3924,6 +3940,7 @@
         function generateSampleInputs() {
             const parameter = document.getElementById('monitoringParameter').value;
             const numEvents = parseInt(document.getElementById('numSamplingEvents').value);
+            const siteName  = (document.getElementById('monitoringSiteName').value || '').trim();
             
             if (!parameter) {
                 alert('⚠️ Please select a parameter to monitor');
@@ -3937,15 +3954,18 @@
             
             const container = document.getElementById('sampleInputsContainer');
             const paramDef = waterParameterDefinitions[parameter];
+            const siteLabel = siteName ? siteName : 'Site';
             
             let html = '<div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">';
-            html += `<h4 style="margin-bottom: 20px;">📝 Enter Sample Data for ${paramDef.name}</h4>`;
+            html += `<h4 style="margin-bottom: 5px;">📝 Enter Sample Data — ${paramDef.name}</h4>`;
+            if (siteName) html += `<p style="margin-bottom: 20px; color: #555; font-size: 0.95rem;">Site: <strong>${siteName}</strong></p>`;
+            else html += '<p style="margin-bottom: 20px; color: #888; font-size: 0.88rem; font-style: italic;">No site name entered — tip: add a site name above for labelled outputs.</p>';
             html += '<div style="display: grid; gap: 20px;">';
             
             for (let i = 1; i <= numEvents; i++) {
                 html += `
                     <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #3498db;">
-                        <h5 style="margin-bottom: 10px; color: #2c3e50;">Sample ${i}</h5>
+                        <h5 style="margin-bottom: 10px; color: #2c3e50;">${siteLabel} — Sample ${i}</h5>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div>
                                 <label style="font-weight: 600; display: block; margin-bottom: 5px;">Date (DD/MM/YY):</label>
@@ -4050,9 +4070,17 @@
             const chartMax = maxConc + (range * 0.2);
             
             if (standards) {
-                if (standards.twqr !== undefined && standards.twqr <= chartMax) {
+                const isEcoli = (parameter === 'ecoli');
+
+                // For E. coli, always show thresholds regardless of data range
+                const showTWQR = standards.twqr !== undefined && (isEcoli || standards.twqr <= chartMax);
+                const showCEV  = standards.cev  !== undefined && standards.cev  !== null && (isEcoli || standards.cev  <= chartMax);
+                const showAEV  = standards.aev  !== undefined && standards.aev  !== null && (isEcoli || standards.aev  <= chartMax);
+
+                if (showTWQR) {
                     datasets.push({
-                        label: 'TWQR (Target Water Quality Range)',
+                        label: isEcoli ? 'Full contact TWQR — Swimming (500 CFU/100mL) [DWAF 1996 Vol.2]'
+                                       : 'TWQR (Target Water Quality Range)',
                         data: Array(labels.length).fill(standards.twqr),
                         borderColor: '#27ae60',
                         borderWidth: 2,
@@ -4061,10 +4089,11 @@
                         fill: false
                     });
                 }
-                
-                if (standards.cev !== undefined && standards.cev <= chartMax) {
+
+                if (showCEV) {
                     datasets.push({
-                        label: 'CEV (Chronic Effect Value)',
+                        label: isEcoli ? 'Full contact limit — Swimming caution (1 000 CFU/100mL)'
+                                       : 'CEV (Chronic Effect Value)',
                         data: Array(labels.length).fill(standards.cev),
                         borderColor: '#f39c12',
                         borderWidth: 2,
@@ -4073,14 +4102,28 @@
                         fill: false
                     });
                 }
-                
-                if (standards.aev !== undefined && standards.aev <= chartMax) {
+
+                if (showAEV) {
                     datasets.push({
-                        label: 'AEV (Acute Effect Value)',
+                        label: isEcoli ? 'All recreational use limit (2 000 CFU/100mL)'
+                                       : 'AEV (Acute Effect Value)',
                         data: Array(labels.length).fill(standards.aev),
                         borderColor: '#e74c3c',
                         borderWidth: 2,
                         borderDash: [10, 5],
+                        pointRadius: 0,
+                        fill: false
+                    });
+                }
+
+                // E. coli: extra line — severe faecal contamination
+                if (isEcoli) {
+                    datasets.push({
+                        label: 'Severe faecal contamination (10 000 CFU/100mL)',
+                        data: Array(labels.length).fill(10000),
+                        borderColor: '#7b241c',
+                        borderWidth: 1.5,
+                        borderDash: [6, 4],
                         pointRadius: 0,
                         fill: false
                     });
@@ -4159,11 +4202,67 @@
             
             // Generate interpretation
             generateMonitoringInterpretation(parameter, paramDef, standards);
+            // E. coli: append activity risk table
+            if (parameter === 'ecoli') generateEcoliRiskTable(concentrations, labels);
             
             // Scroll to graph
             document.getElementById('monitoringGraphContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+
+        function generateEcoliRiskTable(concentrations, labels) {
+            const container = document.getElementById('monitoringInterpretation');
+
+            // Risk tier classification per DWAF (1996) Vol. 2
+            function riskTier(c) {
+                if (c <= 500)   return { tier: 'Low',       colour: '#d4edda', text: '#155724', swim: 'Suitable', paddle: 'Suitable',   fish: 'Suitable' };
+                if (c <= 1000)  return { tier: 'Moderate',  colour: '#fff3cd', text: '#856404', swim: 'Caution',  paddle: 'Suitable',   fish: 'Suitable' };
+                if (c <= 2000)  return { tier: 'High',      colour: '#fde8d5', text: '#7d3c00', swim: 'Not recommended', paddle: 'Caution', fish: 'Suitable' };
+                if (c <= 10000) return { tier: 'Very high', colour: '#f8d7da', text: '#721c24', swim: 'Prohibited',      paddle: 'Not recommended', fish: 'Caution' };
+                return           { tier: 'Severe',          colour: '#c0392b', text: '#ffffff', swim: 'Prohibited',      paddle: 'Prohibited', fish: 'Not recommended' };
+            }
+
+            let table = '<div style="margin-top:20px; padding:18px; background:#fff8f8; border-radius:10px; border-left:4px solid #e74c3c;">';
+            table += '<h5 style="margin:0 0 12px; color:#c0392b; font-size:1rem;">🏊 Human Health Risk Classification — Recreational Activities</h5>';
+            table += '<p style="font-size:0.82rem; color:#666; margin-bottom:12px;">Based on DWAF (1996) South African Water Quality Guidelines, Volume 2: Recreational Use (2nd Ed.).</p>';
+            table += '<div style="overflow-x:auto;">';
+            table += '<table style="width:100%; border-collapse:collapse; font-size:0.85rem;">';
+            table += '<tr style="background:#2c3e50; color:white;">'
+                   + '<th style="padding:9px 12px; text-align:left;">Sample</th>'
+                   + '<th style="padding:9px 12px; text-align:left;">Date</th>'
+                   + '<th style="padding:9px 12px; text-align:right;">E. coli (CFU/100mL)</th>'
+                   + '<th style="padding:9px 12px; text-align:center;">Risk tier</th>'
+                   + '<th style="padding:9px 12px; text-align:center;">🏊 Swimming</th>'
+                   + '<th style="padding:9px 12px; text-align:center;">🛶 Paddling/Kayak</th>'
+                   + '<th style="padding:9px 12px; text-align:center;">🎣 Fishing/Boating</th>'
+                   + '</tr>';
+
+            concentrations.forEach(function(c, i) {
+                var r = riskTier(c);
+                table += '<tr style="background:' + r.colour + '; border-bottom:1px solid rgba(0,0,0,0.07);">'
+                       + '<td style="padding:7px 12px; font-weight:700; color:' + r.text + ';">Sample ' + (i+1) + '</td>'
+                       + '<td style="padding:7px 12px; color:' + r.text + ';">' + (labels[i] || '—') + '</td>'
+                       + '<td style="padding:7px 12px; text-align:right; font-weight:700; color:' + r.text + ';">' + c.toLocaleString() + '</td>'
+                       + '<td style="padding:7px 12px; text-align:center;"><span style="background:' + r.text + '; color:' + r.colour + '; padding:2px 10px; border-radius:10px; font-weight:700; font-size:0.8rem;">' + r.tier + '</span></td>'
+                       + '<td style="padding:7px 12px; text-align:center; font-size:0.82rem; color:' + r.text + ';">' + r.swim + '</td>'
+                       + '<td style="padding:7px 12px; text-align:center; font-size:0.82rem; color:' + r.text + ';">' + r.paddle + '</td>'
+                       + '<td style="padding:7px 12px; text-align:center; font-size:0.82rem; color:' + r.text + ';">' + r.fish + '</td>'
+                       + '</tr>';
+            });
+
+            table += '</table></div>';
+            table += '<div style="margin-top:12px; font-size:0.78rem; color:#888; line-height:1.6;">'
+                   + '<strong>Thresholds applied:</strong> '
+                   + 'Full contact TWQR (swimming): ≤500 CFU/100mL &nbsp;|&nbsp; '
+                   + 'Full contact limit: ≤1 000 CFU/100mL &nbsp;|&nbsp; '
+                   + 'All recreational use limit: ≤2 000 CFU/100mL &nbsp;|&nbsp; '
+                   + 'Severe contamination: &gt;10 000 CFU/100mL.<br>'
+                   + '<strong>Reference:</strong> DWAF (1996). South African Water Quality Guidelines, Volume 2: Recreational Use, 2nd Edition. Department of Water Affairs and Forestry, Pretoria.'
+                   + '</div>';
+            table += '</div>';
+
+            container.insertAdjacentHTML('beforeend', table);
+        }
         function generateMonitoringInterpretation(parameter, paramDef, standards) {
             const container = document.getElementById('monitoringInterpretation');
             
@@ -4203,7 +4302,8 @@
             }
             
             // Build clean text version first (for export)
-            let cleanText = `Automated Interpretation: `;
+            const isEcoliParam = (parameter === 'ecoli');
+            let cleanText = isEcoliParam ? `Microbial Quality Assessment — ${paramDef.name}: ` : `Automated Interpretation: `;
             cleanText += `The monitoring data for ${paramDef.name} shows `;
             cleanText += `${monitoringData.length} sampling events from ${monitoringData[0].date} to ${monitoringData[monitoringData.length - 1].date}. `;
             
@@ -4481,6 +4581,13 @@
             let thresholdText = `<strong>${paramDef.name}:</strong><br>`;
             thresholdText += `<div style="margin-top: 10px;">`;
             
+            if (parameter === 'ecoli') {
+                thresholdText += `<span style="color:#27ae60;">🟢 Full contact TWQR (swimming): 500 CFU/100mL</span><br>`;
+                thresholdText += `<span style="color:#f39c12;">🟡 Full contact limit (caution): 1 000 CFU/100mL</span><br>`;
+                thresholdText += `<span style="color:#e74c3c;">🔴 All recreational use limit: 2 000 CFU/100mL</span><br>`;
+                thresholdText += `<span style="color:#7b241c;">⛔ Severe contamination: &gt;10 000 CFU/100mL</span><br>`;
+                thresholdText += `<em style="font-size:0.85em; color:#888;">DWAF (1996) Vol. 2: Recreational Use, 2nd Ed.</em>`;
+            } else {
             if (standards.twqr !== undefined) {
                 thresholdText += `<span style="color: #27ae60;">✓ TWQR: ${standards.twqr} ${paramDef.unit}</span><br>`;
             }
@@ -4490,6 +4597,7 @@
             if (standards.aev !== undefined && standards.aev !== null) {
                 thresholdText += `<span style="color: #e74c3c;">✖ AEV: ${standards.aev} ${paramDef.unit}</span>`;
             }
+            } // end else non-ecoli
             thresholdText += `</div>`;
             
             thresholdsSpan.innerHTML = thresholdText;
@@ -5934,6 +6042,7 @@
         function generateSedimentSampleInputs() {
             const parameter = document.getElementById('sedimentMonitoringParameter').value;
             const numEvents = parseInt(document.getElementById('numSedimentSamplingEvents').value);
+            const siteName  = (document.getElementById('sedimentMonitoringSiteName').value || '').trim();
             
             if (!parameter) {
                 alert('⚠️ Please select a parameter to monitor');
@@ -5947,15 +6056,18 @@
             
             const container = document.getElementById('sedimentSampleInputsContainer');
             const paramDef = getSedimentParameterDef(parameter);
+            const siteLabel = siteName ? siteName : 'Site';
             
             let html = '<div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">';
-            html += `<h4 style="margin-bottom: 20px;">📝 Enter Sample Data for ${paramDef.name}</h4>`;
+            html += `<h4 style="margin-bottom: 5px;">📝 Enter Sample Data — ${paramDef.name}</h4>`;
+            if (siteName) html += `<p style="margin-bottom: 20px; color: #555; font-size: 0.95rem;">Site: <strong>${siteName}</strong></p>`;
+            else html += '<p style="margin-bottom: 20px; color: #888; font-size: 0.88rem; font-style: italic;">No site name entered — tip: add a site name above for labelled outputs.</p>';
             html += '<div style="display: grid; gap: 20px;">';
             
             for (let i = 1; i <= numEvents; i++) {
                 html += `
                     <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #8B4513;">
-                        <h5 style="margin-bottom: 10px; color: #2c3e50;">Sample ${i}</h5>
+                        <h5 style="margin-bottom: 10px; color: #2c3e50;">${siteLabel} — Sample ${i}</h5>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div>
                                 <label style="font-weight: 600; display: block; margin-bottom: 5px;">Date (DD/MM/YY):</label>
@@ -10884,6 +10996,602 @@
                 console.error(err);
             }
         }
+
+
+        // ═══════════════════════════════════════════════════════════════════
+        // WUL COMPLIANCE TOOL
+        // ═══════════════════════════════════════════════════════════════════
+        var wulParams = [];
+        var wulParamCounter = 0;
+        var wulCurrentResults = [];
+        var wulCurrentMeta = {};
+
+        var wulPresets = [
+            { name: '— Select parameter —', unit: '', limitType: 'max' },
+            { name: 'pH', unit: '', limitType: 'range' },
+            { name: 'EC (Electrical Conductivity)', unit: 'mS/m', limitType: 'max' },
+            { name: 'Chemical Oxygen Demand (COD)', unit: 'mg/l', limitType: 'max' },
+            { name: 'Biochemical Oxygen Demand (BOD)', unit: 'mg/l', limitType: 'max' },
+            { name: 'Ammonia as N', unit: 'mg/l', limitType: 'max' },
+            { name: 'Orthophosphate as P', unit: 'mg/l', limitType: 'max' },
+            { name: 'Total Phosphorus', unit: 'mg/l', limitType: 'max' },
+            { name: 'Nitrate as N', unit: 'mg/l', limitType: 'max' },
+            { name: 'Nitrite as N', unit: 'mg/l', limitType: 'max' },
+            { name: 'Chloride as Cl', unit: 'mg/l', limitType: 'max' },
+            { name: 'Suspended Solids (SS)', unit: 'mg/l', limitType: 'max' },
+            { name: 'Total Dissolved Solids (TDS)', unit: 'mg/l', limitType: 'max' },
+            { name: 'Residual Chlorine', unit: 'mg/l', limitType: 'max' },
+            { name: 'E. coli', unit: 'CFU/100mL', limitType: 'max' },
+            { name: 'Faecal Coliforms', unit: 'CFU/100mL', limitType: 'max' },
+            { name: 'Arsenic as As', unit: 'mg/l', limitType: 'max' },
+            { name: 'Boron as B', unit: 'mg/l', limitType: 'max' },
+            { name: 'Hexavalent Chromium as Cr(VI)', unit: 'mg/l', limitType: 'max' },
+            { name: 'Total Chromium as Cr', unit: 'mg/l', limitType: 'max' },
+            { name: 'Copper as Cu', unit: 'mg/l', limitType: 'max' },
+            { name: 'Phenolic Compounds as phenol', unit: 'mg/l', limitType: 'max' },
+            { name: 'Sulphides as S', unit: 'mg/l', limitType: 'max' },
+            { name: 'Fluoride as F', unit: 'mg/l', limitType: 'max' },
+            { name: 'Manganese as Mn', unit: 'mg/l', limitType: 'max' },
+            { name: 'Zinc as Zn', unit: 'mg/l', limitType: 'max' },
+            { name: 'Cadmium as Cd', unit: 'mg/l', limitType: 'max' },
+            { name: 'Mercury as Hg', unit: 'mg/l', limitType: 'max' },
+            { name: 'Selenium as Se', unit: 'mg/l', limitType: 'max' },
+            { name: 'Lead as Pb', unit: 'mg/l', limitType: 'max' },
+            { name: 'Nickel as Ni', unit: 'mg/l', limitType: 'max' },
+            { name: 'Iron as Fe', unit: 'mg/l', limitType: 'max' },
+            { name: 'Temperature', unit: 'deg C', limitType: 'max' },
+            { name: 'Turbidity', unit: 'NTU', limitType: 'max' },
+            { name: 'Dissolved Oxygen', unit: 'mg/l', limitType: 'min' },
+            { name: 'Other / Custom', unit: '', limitType: 'max' }
+        ];
+
+        function initWulSection() {
+            var el = document.getElementById('water-wul-compliance');
+            if (!el) return;
+            var h = '';
+            h += '<div style="padding:20px 0;">';
+
+            // Step indicator
+            h += '<div style="display:flex; gap:0; margin-bottom:25px; border-radius:8px; overflow:hidden; border:1px solid #dde2e8;">';
+            h += '<div id="wulInd1" style="flex:1; padding:10px; text-align:center; background:#2471a3; color:white; font-weight:700; font-size:0.85rem;">1. Setup</div>';
+            h += '<div id="wulInd2" style="flex:1; padding:10px; text-align:center; background:#e9ecef; color:#888; font-weight:700; font-size:0.85rem;">2. Enter Values</div>';
+            h += '<div id="wulInd3" style="flex:1; padding:10px; text-align:center; background:#e9ecef; color:#888; font-weight:700; font-size:0.85rem;">3. Results</div>';
+            h += '</div>';
+
+            // ── STEP 1 ────────────────────────────────────────────────────
+            h += '<div id="wulP1">';
+
+            // Licence details
+            h += '<div style="background:#f8f9fa; border-radius:10px; padding:18px; margin-bottom:18px; border:1px solid #dde2e8;">';
+            h += '<div style="font-weight:700; color:#1a5276; margin-bottom:12px; font-size:0.95rem;">📋 Licence &amp; Facility Details</div>';
+            h += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">';
+            h += '<div><label style="font-size:0.82rem; font-weight:700; color:#2c3e50; display:block; margin-bottom:4px;">WUL Number</label><input type="text" id="wulLicNo" placeholder="e.g. 19/G22C/F/1443" style="width:100%; padding:9px; border:2px solid #dde2e8; border-radius:8px; font-size:0.9rem; box-sizing:border-box;"></div>';
+            h += '<div><label style="font-size:0.82rem; font-weight:700; color:#2c3e50; display:block; margin-bottom:4px;">Facility / Site Name</label><input type="text" id="wulFac" placeholder="e.g. Athlone WWTW" style="width:100%; padding:9px; border:2px solid #dde2e8; border-radius:8px; font-size:0.9rem; box-sizing:border-box;"></div>';
+            h += '<div><label style="font-size:0.82rem; font-weight:700; color:#2c3e50; display:block; margin-bottom:4px;">Assessment Date</label><input type="date" id="wulDate" style="width:100%; padding:9px; border:2px solid #dde2e8; border-radius:8px; font-size:0.9rem; box-sizing:border-box;"></div>';
+            h += '<div><label style="font-size:0.82rem; font-weight:700; color:#2c3e50; display:block; margin-bottom:4px;">Assessed by (EMI)</label><input type="text" id="wulEmi" placeholder="e.g. Dr J. Levin" style="width:100%; padding:9px; border:2px solid #dde2e8; border-radius:8px; font-size:0.9rem; box-sizing:border-box;"></div>';
+            h += '</div></div>';
+
+            // Parameter builder
+            h += '<div style="background:#f8f9fa; border-radius:10px; padding:18px; margin-bottom:18px; border:1px solid #dde2e8;">';
+            h += '<div style="font-weight:700; color:#1a5276; margin-bottom:12px; font-size:0.95rem;">➕ Add Parameters from WUL</div>';
+            h += '<div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:10px; margin-bottom:10px;">';
+            h += '<div><label style="font-size:0.8rem; font-weight:700; color:#2c3e50; display:block; margin-bottom:4px;">Parameter</label><select id="wulSel" onchange="wulSelChange()" style="width:100%; padding:9px; border:2px solid #dde2e8; border-radius:8px; font-size:0.85rem; background:white;">';
+            for (var pi = 0; pi < 36; pi++) h += ''; // filled by JS below
+            h += '</select></div>';
+            h += '<div><label style="font-size:0.8rem; font-weight:700; color:#2c3e50; display:block; margin-bottom:4px;">Unit</label><input type="text" id="wulUnit" placeholder="mg/l" style="width:100%; padding:9px; border:2px solid #dde2e8; border-radius:8px; font-size:0.85rem; box-sizing:border-box;"></div>';
+            h += '<div><label style="font-size:0.8rem; font-weight:700; color:#2c3e50; display:block; margin-bottom:4px;">Limit type</label><select id="wulLimType" onchange="wulLimTypeChange()" style="width:100%; padding:9px; border:2px solid #dde2e8; border-radius:8px; font-size:0.85rem; background:white;"><option value="max">Maximum (&le;)</option><option value="min">Minimum (&ge;)</option><option value="range">Range (between)</option></select></div>';
+            h += '</div>';
+            // custom name row
+            h += '<div id="wulCustRow" style="display:none; margin-bottom:10px;"><label style="font-size:0.8rem; font-weight:700; color:#2c3e50; display:block; margin-bottom:4px;">Custom parameter name</label><input type="text" id="wulCustName" placeholder="Enter name" style="width:100%; padding:9px; border:2px solid #dde2e8; border-radius:8px; font-size:0.85rem; box-sizing:border-box;"></div>';
+            // limit value inputs
+            h += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">';
+            h += '<div><label style="font-size:0.8rem; font-weight:700; color:#2c3e50; display:block; margin-bottom:4px;" id="wulLimLbl">Limit value</label><input type="number" id="wulLimVal" step="any" placeholder="e.g. 75" style="width:100%; padding:9px; border:2px solid #dde2e8; border-radius:8px; font-size:0.85rem; box-sizing:border-box;"></div>';
+            h += '<div id="wulLimMaxDiv" style="display:none;"><label style="font-size:0.8rem; font-weight:700; color:#2c3e50; display:block; margin-bottom:4px;">Maximum value</label><input type="number" id="wulLimMax" step="any" placeholder="e.g. 8.0" style="width:100%; padding:9px; border:2px solid #dde2e8; border-radius:8px; font-size:0.85rem; box-sizing:border-box;"></div>';
+            h += '</div>';
+            h += '<button onclick="wulAddParam()" style="width:100%; padding:12px; border:none; border-radius:9px; background:#27ae60; color:white; font-weight:700; font-size:0.95rem; cursor:pointer;">&#10133; Add to Assessment List</button>';
+            h += '</div>';
+
+            // Param list
+            h += '<div id="wulListWrap" style="display:none; background:white; border-radius:10px; padding:15px; margin-bottom:18px; border:1px solid #aed6f1;">';
+            h += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">';
+            h += '<div style="font-weight:700; color:#1a5276; font-size:0.93rem;">Parameters added: <span id="wulCount">0</span></div>';
+            h += '<button onclick="wulClearAll()" style="padding:4px 12px; border:none; border-radius:6px; background:#e74c3c; color:white; font-size:0.8rem; font-weight:700; cursor:pointer;">Clear All</button>';
+            h += '</div><div id="wulList"></div></div>';
+
+            h += '<div style="text-align:center; margin-top:8px;">';
+            h += '<button onclick="wulGenForm()" style="padding:14px 40px; border:none; border-radius:10px; background:linear-gradient(135deg,#1a5276,#2471a3); color:white; font-weight:700; font-size:1rem; cursor:pointer; box-shadow:0 4px 15px rgba(36,113,163,0.3);">&#128221; Generate Data Entry Form</button>';
+            h += '</div>';
+            h += '</div>'; // wulP1
+
+            // ── STEP 2 ────────────────────────────────────────────────────
+            h += '<div id="wulP2" style="display:none;">';
+            h += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">';
+            h += '<div style="font-weight:700; color:#1a5276; font-size:0.95rem;">&#128202; Enter Measured / Analytical Values</div>';
+            h += '<button onclick="wulBack1()" style="padding:7px 15px; border:1px solid #aed6f1; border-radius:8px; background:white; color:#1a5276; font-weight:700; font-size:0.85rem; cursor:pointer;">&#8592; Back to Setup</button>';
+            h += '</div>';
+            h += '<div id="wulDataTbl"></div>';
+            h += '<div style="text-align:center; margin-top:18px;">';
+            h += '<button onclick="wulAssess()" style="padding:14px 40px; border:none; border-radius:10px; background:linear-gradient(135deg,#1e8449,#27ae60); color:white; font-weight:700; font-size:1rem; cursor:pointer; box-shadow:0 4px 15px rgba(39,174,96,0.3);">&#9989; Generate Compliance Assessment</button>';
+            h += '</div>';
+            h += '</div>'; // wulP2
+
+            // ── STEP 3 ────────────────────────────────────────────────────
+            h += '<div id="wulP3" style="display:none;">';
+            h += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">';
+            h += '<div style="font-weight:700; color:#1a5276; font-size:0.95rem;">&#128203; Compliance Assessment — Results</div>';
+            h += '<div style="display:flex; gap:8px; flex-wrap:wrap;">';
+            h += '<button onclick="wulBack2()" style="padding:7px 15px; border:1px solid #aed6f1; border-radius:8px; background:white; color:#1a5276; font-weight:700; font-size:0.85rem; cursor:pointer;">&#8592; Edit Values</button>';
+            h += '<button onclick="wulExportPDF()" style="padding:7px 16px; border:none; border-radius:8px; background:linear-gradient(135deg,#c0392b,#e74c3c); color:white; font-weight:700; font-size:0.85rem; cursor:pointer;">&#128196; Export PDF</button>';
+            h += '<button onclick="wulReset()" style="padding:7px 14px; border:none; border-radius:8px; background:#888; color:white; font-weight:700; font-size:0.85rem; cursor:pointer;">&#8635; New Assessment</button>';
+            h += '</div></div>';
+            h += '<div id="wulResHdr" style="background:#eaf4fb; border-radius:8px; padding:13px 16px; margin-bottom:14px; font-size:0.9rem; color:#1a5276; border:1px solid #aed6f1; line-height:1.7;"></div>';
+            h += '<div id="wulResTbl"></div>';
+            h += '<div id="wulFindings" style="margin-top:18px; padding:18px; background:#fff8e1; border-radius:10px; border-left:4px solid #f39c12;"></div>';
+            h += '</div>'; // wulP3
+
+            h += '</div>'; // outer padding div
+            el.innerHTML = h;
+
+            // Populate select
+            var sel = document.getElementById('wulSel');
+            if (sel) {
+                wulPresets.forEach(function(p) {
+                    var opt = document.createElement('option');
+                    opt.value = p.name;
+                    opt.textContent = p.name;
+                    sel.appendChild(opt);
+                });
+            }
+            // Set today's date
+            var d = document.getElementById('wulDate');
+            if (d) d.value = new Date().toISOString().slice(0,10);
+        }
+
+        function wulSelChange() {
+            var sel = document.getElementById('wulSel');
+            var idx = sel.selectedIndex;
+            if (idx < 0 || idx >= wulPresets.length) return;
+            var p = wulPresets[idx];
+            var custRow = document.getElementById('wulCustRow');
+            if (p.name === 'Other / Custom') {
+                custRow.style.display = 'block';
+            } else {
+                custRow.style.display = 'none';
+                document.getElementById('wulCustName').value = '';
+            }
+            if (p.unit) document.getElementById('wulUnit').value = p.unit;
+            var lt = document.getElementById('wulLimType');
+            lt.value = p.limitType;
+            wulLimTypeChange();
+        }
+
+        function wulLimTypeChange() {
+            var lt = document.getElementById('wulLimType').value;
+            var lbl = document.getElementById('wulLimLbl');
+            var maxDiv = document.getElementById('wulLimMaxDiv');
+            if (lt === 'range') {
+                lbl.textContent = 'Minimum value';
+                maxDiv.style.display = 'block';
+            } else {
+                lbl.textContent = lt === 'max' ? 'Maximum limit' : 'Minimum limit';
+                maxDiv.style.display = 'none';
+            }
+        }
+
+        function wulAddParam() {
+            var sel = document.getElementById('wulSel');
+            var selVal = sel.value;
+            var name = (selVal === 'Other / Custom' || selVal === '— Select parameter —') ?
+                       (document.getElementById('wulCustName').value.trim()) : selVal;
+            if (!name || name === '— Select parameter —') { alert('Please select or enter a parameter name.'); return; }
+            var unit = document.getElementById('wulUnit').value.trim();
+            var lt   = document.getElementById('wulLimType').value;
+            var lv   = parseFloat(document.getElementById('wulLimVal').value);
+            var lx   = parseFloat(document.getElementById('wulLimMax').value);
+            if (lt === 'range') {
+                if (isNaN(lv) || isNaN(lx)) { alert('Please enter both minimum and maximum values for a range limit.'); return; }
+                if (lv >= lx) { alert('Minimum must be less than maximum for a range limit.'); return; }
+            } else {
+                if (isNaN(lv)) { alert('Please enter the limit value.'); return; }
+            }
+            wulParamCounter++;
+            wulParams.push({
+                id:       wulParamCounter,
+                name:     name,
+                unit:     unit,
+                limitType: lt,
+                limitVal: (lt !== 'range') ? lv : null,
+                limitMin: (lt === 'range') ? lv : null,
+                limitMax: (lt === 'range') ? lx : null
+            });
+            wulRenderList();
+            // reset fields
+            sel.selectedIndex = 0;
+            document.getElementById('wulUnit').value = '';
+            document.getElementById('wulLimVal').value = '';
+            document.getElementById('wulLimMax').value = '';
+            document.getElementById('wulCustName').value = '';
+            document.getElementById('wulCustRow').style.display = 'none';
+            document.getElementById('wulLimType').value = 'max';
+            wulLimTypeChange();
+        }
+
+        function wulRenderList() {
+            var wrap = document.getElementById('wulListWrap');
+            var list = document.getElementById('wulList');
+            var cnt  = document.getElementById('wulCount');
+            if (!wrap) return;
+            if (wulParams.length === 0) { wrap.style.display = 'none'; return; }
+            wrap.style.display = 'block';
+            cnt.textContent = wulParams.length;
+            var h = '<table style="width:100%; border-collapse:collapse; font-size:0.85rem;">';
+            h += '<tr style="background:#eaf4fb;"><th style="padding:7px 10px; text-align:left; border-bottom:2px solid #aed6f1;">#</th><th style="padding:7px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Parameter</th><th style="padding:7px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Unit</th><th style="padding:7px 10px; text-align:left; border-bottom:2px solid #aed6f1;">WUL Limit</th><th style="padding:7px 10px; border-bottom:2px solid #aed6f1;"></th></tr>';
+            wulParams.forEach(function(p, i) {
+                var limDisp = (p.limitType === 'max') ? ('&le; ' + p.limitVal)
+                            : (p.limitType === 'min') ? ('&ge; ' + p.limitVal)
+                            : (p.limitMin + ' &ndash; ' + p.limitMax);
+                h += '<tr style="border-bottom:1px solid #e8eef3;">'
+                   + '<td style="padding:6px 10px; color:#555;">' + (i+1) + '</td>'
+                   + '<td style="padding:6px 10px; font-weight:700; color:#1a5276;">' + p.name + '</td>'
+                   + '<td style="padding:6px 10px; color:#555;">' + (p.unit || '—') + '</td>'
+                   + '<td style="padding:6px 10px; color:#1e8449; font-weight:700;">' + limDisp + '</td>'
+                   + '<td style="padding:6px 10px; text-align:right;"><button onclick="wulRemove(' + p.id + ')" style="background:#e74c3c; color:white; border:none; padding:3px 9px; border-radius:5px; cursor:pointer; font-size:0.8rem;">&#10005;</button></td>'
+                   + '</tr>';
+            });
+            h += '</table>';
+            list.innerHTML = h;
+        }
+
+        function wulRemove(id) {
+            wulParams = wulParams.filter(function(p) { return p.id !== id; });
+            wulRenderList();
+        }
+
+        function wulClearAll() {
+            if (!confirm('Clear all parameters?')) return;
+            wulParams = [];
+            wulRenderList();
+        }
+
+        function wulGenForm() {
+            if (wulParams.length === 0) { alert('Please add at least one parameter before generating the form.'); return; }
+            var container = document.getElementById('wulDataTbl');
+            var h = '<div style="overflow-x:auto;">';
+            h += '<table style="width:100%; border-collapse:collapse; font-size:0.88rem;">';
+            h += '<thead><tr style="background:#2c3e50; color:white;">'
+               + '<th style="padding:10px 12px; text-align:left;">#</th>'
+               + '<th style="padding:10px 12px; text-align:left;">Parameter</th>'
+               + '<th style="padding:10px 12px; text-align:left;">Unit</th>'
+               + '<th style="padding:10px 12px; text-align:left;">WUL Limit</th>'
+               + '<th style="padding:10px 12px; text-align:left; min-width:140px;">Measured Value</th>'
+               + '<th style="padding:10px 12px; text-align:left; min-width:160px;">Notes</th>'
+               + '</tr></thead><tbody>';
+            wulParams.forEach(function(p, i) {
+                var limDisp = (p.limitType === 'max') ? ('&le; ' + p.limitVal + (p.unit ? ' ' + p.unit : ''))
+                            : (p.limitType === 'min') ? ('&ge; ' + p.limitVal + (p.unit ? ' ' + p.unit : ''))
+                            : (p.limitMin + ' &ndash; ' + p.limitMax + (p.unit ? ' ' + p.unit : ''));
+                var bg = i % 2 === 0 ? '#f8f9fa' : 'white';
+                h += '<tr style="background:' + bg + '; border-bottom:1px solid #e8eef3;">'
+                   + '<td style="padding:10px 12px; color:#555; font-weight:700;">' + (i+1) + '</td>'
+                   + '<td style="padding:10px 12px; font-weight:700; color:#1a5276;">' + p.name + '</td>'
+                   + '<td style="padding:10px 12px; color:#555;">' + (p.unit || '—') + '</td>'
+                   + '<td style="padding:10px 12px; color:#1e8449; font-weight:700;">' + limDisp + '</td>'
+                   + '<td style="padding:10px 12px;"><input type="number" step="any" id="wulMeas_' + p.id + '" placeholder="enter value" style="width:130px; padding:8px; border:2px solid #dde2e8; border-radius:7px; font-size:0.9rem;"></td>'
+                   + '<td style="padding:10px 12px;"><input type="text" id="wulNote_' + p.id + '" placeholder="optional" style="width:150px; padding:8px; border:2px solid #dde2e8; border-radius:7px; font-size:0.9rem;"></td>'
+                   + '</tr>';
+            });
+            h += '</tbody></table></div>';
+            container.innerHTML = h;
+            // show step 2
+            document.getElementById('wulP1').style.display = 'none';
+            document.getElementById('wulP2').style.display = 'block';
+            document.getElementById('wulP3').style.display = 'none';
+            document.getElementById('wulInd1').style.background = '#aed6f1'; document.getElementById('wulInd1').style.color = '#1a5276';
+            document.getElementById('wulInd2').style.background = '#2471a3'; document.getElementById('wulInd2').style.color = 'white';
+            document.getElementById('wulInd3').style.background = '#e9ecef'; document.getElementById('wulInd3').style.color = '#888';
+        }
+
+        function wulCheckCompliance(p, measured) {
+            if (measured === null || isNaN(measured)) return { status: 'NOT MEASURED', code: 'nm', excPct: null };
+            if (p.limitType === 'max') {
+                if (measured > p.limitVal) {
+                    return { status: 'NON-COMPLIANT', code: 'fail', excPct: (((measured - p.limitVal) / p.limitVal) * 100).toFixed(1) };
+                }
+                if (measured > p.limitVal * 0.9) {
+                    return { status: 'WARNING', code: 'warn', excPct: null, note: 'Within 10% of limit' };
+                }
+                return { status: 'COMPLIANT', code: 'ok', excPct: null };
+            }
+            if (p.limitType === 'min') {
+                if (measured < p.limitVal) {
+                    return { status: 'NON-COMPLIANT', code: 'fail', excPct: (((p.limitVal - measured) / p.limitVal) * 100).toFixed(1), deficit: true };
+                }
+                if (measured < p.limitVal * 1.1) {
+                    return { status: 'WARNING', code: 'warn', excPct: null, note: 'Within 10% of limit' };
+                }
+                return { status: 'COMPLIANT', code: 'ok', excPct: null };
+            }
+            if (p.limitType === 'range') {
+                if (measured >= p.limitMin && measured <= p.limitMax) {
+                    var nearMin = measured < p.limitMin + (p.limitMax - p.limitMin) * 0.1;
+                    var nearMax = measured > p.limitMax - (p.limitMax - p.limitMin) * 0.1;
+                    if (nearMin || nearMax) return { status: 'WARNING', code: 'warn', excPct: null, note: 'Near range boundary' };
+                    return { status: 'COMPLIANT', code: 'ok', excPct: null };
+                }
+                if (measured < p.limitMin) return { status: 'NON-COMPLIANT (below range)', code: 'fail', excPct: (((p.limitMin - measured) / p.limitMin) * 100).toFixed(1), deficit: true };
+                return { status: 'NON-COMPLIANT (above range)', code: 'fail', excPct: (((measured - p.limitMax) / p.limitMax) * 100).toFixed(1) };
+            }
+            return { status: 'UNKNOWN', code: 'nm', excPct: null };
+        }
+
+        function wulAssess() {
+            wulCurrentMeta = {
+                licenceNo:  document.getElementById('wulLicNo').value.trim(),
+                facility:   document.getElementById('wulFac').value.trim(),
+                date:       document.getElementById('wulDate').value,
+                assessor:   document.getElementById('wulEmi').value.trim()
+            };
+            wulCurrentResults = [];
+            wulParams.forEach(function(p) {
+                var mEl = document.getElementById('wulMeas_' + p.id);
+                var nEl = document.getElementById('wulNote_' + p.id);
+                var measured = mEl && mEl.value !== '' ? parseFloat(mEl.value) : null;
+                var note     = nEl ? nEl.value.trim() : '';
+                var limDisp  = (p.limitType === 'max') ? ('\u2264 ' + p.limitVal)
+                             : (p.limitType === 'min') ? ('\u2265 ' + p.limitVal)
+                             : (p.limitMin + ' \u2013 ' + p.limitMax);
+                var compliance = wulCheckCompliance(p, measured);
+                wulCurrentResults.push({
+                    name:       p.name,
+                    unit:       p.unit,
+                    limitType:  p.limitType,
+                    limitDisp:  limDisp,
+                    measured:   measured,
+                    note:       note,
+                    compliance: compliance
+                });
+            });
+            wulRenderResults();
+            document.getElementById('wulP1').style.display = 'none';
+            document.getElementById('wulP2').style.display = 'none';
+            document.getElementById('wulP3').style.display = 'block';
+            document.getElementById('wulInd1').style.background = '#aed6f1'; document.getElementById('wulInd1').style.color = '#1a5276';
+            document.getElementById('wulInd2').style.background = '#aed6f1'; document.getElementById('wulInd2').style.color = '#1a5276';
+            document.getElementById('wulInd3').style.background = '#1e8449'; document.getElementById('wulInd3').style.color = 'white';
+            document.getElementById('wulP3').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function wulRenderResults() {
+            var m = wulCurrentMeta;
+            var hdr = document.getElementById('wulResHdr');
+            hdr.innerHTML = '<strong>WUL No.:</strong> ' + (m.licenceNo || 'N/A') + '&nbsp;&nbsp;|&nbsp;&nbsp;'
+                          + '<strong>Facility:</strong> ' + (m.facility || 'N/A') + '&nbsp;&nbsp;|&nbsp;&nbsp;'
+                          + '<strong>Date:</strong> ' + (m.date || 'N/A') + '&nbsp;&nbsp;|&nbsp;&nbsp;'
+                          + '<strong>Assessed by:</strong> ' + (m.assessor || 'N/A');
+
+            var nFail = 0, nWarn = 0, nOk = 0, nNm = 0;
+            wulCurrentResults.forEach(function(r) {
+                if (r.compliance.code === 'fail') nFail++;
+                else if (r.compliance.code === 'warn') nWarn++;
+                else if (r.compliance.code === 'ok') nOk++;
+                else nNm++;
+            });
+
+            // Legend
+            var tbl = document.getElementById('wulResTbl');
+            var h = '';
+            h += '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; font-size:0.82rem; font-weight:700;">';
+            h += '<span style="background:#d4edda; color:#155724; padding:4px 12px; border-radius:12px;">&check; Compliant: ' + nOk + '</span>';
+            h += '<span style="background:#fff3cd; color:#856404; padding:4px 12px; border-radius:12px;">&#9888; Warning: ' + nWarn + '</span>';
+            h += '<span style="background:#f8d7da; color:#721c24; padding:4px 12px; border-radius:12px;">&#10007; Non-compliant: ' + nFail + '</span>';
+            if (nNm > 0) h += '<span style="background:#e9ecef; color:#555; padding:4px 12px; border-radius:12px;">&#8212; Not measured: ' + nNm + '</span>';
+            h += '</div>';
+
+            h += '<div style="overflow-x:auto;">';
+            h += '<table style="width:100%; border-collapse:collapse; font-size:0.88rem;">';
+            h += '<thead><tr style="background:#2c3e50; color:white;">'
+               + '<th style="padding:10px 12px; text-align:left; min-width:160px;">Parameter</th>'
+               + '<th style="padding:10px 12px; text-align:left;">Unit</th>'
+               + '<th style="padding:10px 12px; text-align:left;">WUL Limit</th>'
+               + '<th style="padding:10px 12px; text-align:right;">Measured</th>'
+               + '<th style="padding:10px 12px; text-align:right;">Exceedance</th>'
+               + '<th style="padding:10px 12px; text-align:center; min-width:170px;">Status</th>'
+               + '<th style="padding:10px 12px; text-align:left;">Notes</th>'
+               + '</tr></thead><tbody>';
+
+            wulCurrentResults.forEach(function(r) {
+                var bg, tc, icon;
+                if (r.compliance.code === 'ok')   { bg = '#d4edda'; tc = '#155724'; icon = '&#10003;'; }
+                else if (r.compliance.code === 'warn') { bg = '#fff3cd'; tc = '#856404'; icon = '&#9888;'; }
+                else if (r.compliance.code === 'fail') { bg = '#f8d7da'; tc = '#721c24'; icon = '&#10007;'; }
+                else                               { bg = '#f0f0f0'; tc = '#555';    icon = '&ndash;'; }
+
+                var excDisp = '—';
+                if (r.compliance.excPct !== null && r.compliance.excPct !== undefined) {
+                    excDisp = (r.compliance.deficit ? '-' : '+') + r.compliance.excPct + '%';
+                }
+                var measDisp = (r.measured !== null && !isNaN(r.measured)) ? r.measured : '—';
+
+                h += '<tr style="background:' + bg + '; border-bottom:1px solid rgba(0,0,0,0.06);">'
+                   + '<td style="padding:10px 12px; font-weight:700; color:' + tc + ';">' + r.name + '</td>'
+                   + '<td style="padding:10px 12px; color:' + tc + ';">' + (r.unit || '—') + '</td>'
+                   + '<td style="padding:10px 12px; font-weight:700; color:' + tc + ';">' + r.limitDisp + '</td>'
+                   + '<td style="padding:10px 12px; text-align:right; font-weight:700; color:' + tc + ';">' + measDisp + '</td>'
+                   + '<td style="padding:10px 12px; text-align:right; font-weight:700; color:' + tc + ';">' + excDisp + '</td>'
+                   + '<td style="padding:10px 12px; text-align:center;"><span style="background:' + tc + '; color:' + bg + '; padding:3px 12px; border-radius:12px; font-weight:700; font-size:0.82rem;">' + icon + ' ' + r.compliance.status + '</span></td>'
+                   + '<td style="padding:10px 12px; font-size:0.82rem; color:' + tc + ';">' + (r.note || (r.compliance.note || '—')) + '</td>'
+                   + '</tr>';
+            });
+            h += '</tbody></table></div>';
+            tbl.innerHTML = h;
+            wulRenderFindings(nFail, nWarn, nOk);
+        }
+
+        function wulRenderFindings(nFail, nWarn, nOk) {
+            var m = wulCurrentMeta;
+            var total = wulCurrentResults.length;
+            var f = document.getElementById('wulFindings');
+
+            var failList = wulCurrentResults.filter(function(r) { return r.compliance.code === 'fail'; });
+            var warnList = wulCurrentResults.filter(function(r) { return r.compliance.code === 'warn'; });
+
+            var txt = '<h5 style="margin:0 0 10px; color:#d35400; font-size:1rem;">&#128196; Major Findings</h5>';
+            txt += '<div id="wulFindingsText" style="font-size:0.9rem; color:#333; line-height:1.8;">';
+
+            var intro = 'Assessment of <strong>' + (m.facility || 'facility') + '</strong>';
+            if (m.licenceNo) intro += ' against Water Use Licence <strong>' + m.licenceNo + '</strong>';
+            if (m.date) intro += ' on <strong>' + m.date + '</strong>';
+            intro += '. ';
+            intro += '<strong>' + total + '</strong> parameters were assessed.';
+            txt += '<p>' + intro + '</p>';
+
+            if (nFail === 0 && nWarn === 0) {
+                txt += '<p style="color:#1e8449;"><strong>&#10003; All ' + nOk + ' parameters are compliant with the WUL limits.</strong> No exceedances or warning-zone values were detected.</p>';
+            } else {
+                if (nFail > 0) {
+                    txt += '<p><strong style="color:#c0392b;">&#10007; ' + nFail + ' parameter' + (nFail > 1 ? 's' : '') + ' exceeded the WUL limit' + (nFail > 1 ? 's' : '') + ':</strong> ';
+                    txt += failList.map(function(r) {
+                        var s = '<strong>' + r.name + '</strong>';
+                        if (r.compliance.excPct !== null) s += ' (measured ' + r.measured + (r.unit ? ' ' + r.unit : '') + '; ' + (r.compliance.deficit ? 'deficit' : 'exceedance') + ' ' + r.compliance.excPct + '%)';
+                        return s;
+                    }).join('; ') + '.</p>';
+                }
+                if (nWarn > 0) {
+                    txt += '<p><strong style="color:#b7770d;">&#9888; ' + nWarn + ' parameter' + (nWarn > 1 ? 's' : '') + ' within 10% of the WUL limit (warning zone):</strong> ';
+                    txt += warnList.map(function(r) { return '<strong>' + r.name + '</strong>'; }).join(', ') + '.</p>';
+                }
+                if (nOk > 0) {
+                    txt += '<p><strong style="color:#1e8449;">&#10003; ' + nOk + ' parameter' + (nOk > 1 ? 's' : '') + ' compliant.</strong></p>';
+                }
+                if (nFail > 0) {
+                    txt += '<p>These exceedances constitute a contravention of the conditions of the Water Use Licence and may be subject to enforcement action under the National Water Act (Act 36 of 1998) and applicable Environmental Management Legislation. Further investigation and formal notice to the licence holder is recommended.</p>';
+                }
+            }
+            txt += '<p style="font-size:0.82rem; color:#888; margin-top:8px;">Generated by the Green Scorpions Environmental Compliance Portal. This automated assessment is intended to assist EMIs and does not replace professional legal or scientific judgement.</p>';
+            txt += '</div>';
+            f.innerHTML = txt;
+        }
+
+        function wulBack1() {
+            document.getElementById('wulP2').style.display = 'none';
+            document.getElementById('wulP1').style.display = 'block';
+            document.getElementById('wulInd1').style.background = '#2471a3'; document.getElementById('wulInd1').style.color = 'white';
+            document.getElementById('wulInd2').style.background = '#e9ecef'; document.getElementById('wulInd2').style.color = '#888';
+        }
+
+        function wulBack2() {
+            document.getElementById('wulP3').style.display = 'none';
+            document.getElementById('wulP2').style.display = 'block';
+            document.getElementById('wulInd2').style.background = '#2471a3'; document.getElementById('wulInd2').style.color = 'white';
+            document.getElementById('wulInd3').style.background = '#e9ecef'; document.getElementById('wulInd3').style.color = '#888';
+        }
+
+        function wulReset() {
+            if (!confirm('Start a new assessment? All current data will be cleared.')) return;
+            wulParams = [];
+            wulParamCounter = 0;
+            wulCurrentResults = [];
+            wulCurrentMeta = {};
+            initWulSection();
+        }
+
+        function wulExportPDF() {
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                alert('PDF library not yet loaded. Please wait a moment and try again.');
+                return;
+            }
+            var jsPDF = window.jspdf.jsPDF;
+            var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            var m  = wulCurrentMeta;
+            var pw = 210, mg = 14, y = 18;
+            var cw = pw - mg * 2;
+
+            // Header bar
+            doc.setFillColor(44, 62, 80);
+            doc.rect(0, 0, pw, 14, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('WUL COMPLIANCE ASSESSMENT REPORT', pw / 2, 9.5, { align: 'center' });
+
+            y = 22;
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Licence No.:', mg, y);       doc.setFont('helvetica', 'normal'); doc.text(m.licenceNo || 'N/A', mg + 28, y);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Facility:', mg + 85, y);     doc.setFont('helvetica', 'normal'); doc.text(m.facility || 'N/A', mg + 100, y);
+            y += 5.5;
+            doc.setFont('helvetica', 'bold');
+            doc.text('Date:', mg, y);              doc.setFont('helvetica', 'normal'); doc.text(m.date || 'N/A', mg + 28, y);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Assessed by:', mg + 85, y); doc.setFont('helvetica', 'normal'); doc.text(m.assessor || 'N/A', mg + 115, y);
+            y += 8;
+
+            // Table header
+            var cols = [55, 14, 28, 22, 20, 42]; // param, unit, limit, measured, exceed, status
+            var colX = [mg];
+            cols.forEach(function(w, i) { if (i > 0) colX.push(colX[i-1] + cols[i-1]); });
+            var hdrs = ['Parameter', 'Unit', 'WUL Limit', 'Measured', 'Exceed.', 'Status'];
+
+            doc.setFillColor(44, 62, 80);
+            doc.rect(mg, y, cw, 7, 'F');
+            doc.setTextColor(255,255,255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            hdrs.forEach(function(h, i) { doc.text(h, colX[i] + 1.5, y + 4.8); });
+            y += 7;
+
+            doc.setFont('helvetica', 'normal');
+            wulCurrentResults.forEach(function(r) {
+                var rh = 7;
+                var rc = r.compliance.code;
+                if (rc === 'ok')   doc.setFillColor(212,237,218);
+                else if (rc === 'warn') doc.setFillColor(255,243,205);
+                else if (rc === 'fail') doc.setFillColor(248,215,218);
+                else               doc.setFillColor(240,240,240);
+                doc.rect(mg, y, cw, rh, 'F');
+                doc.setTextColor(0,0,0);
+                doc.setFontSize(7.5);
+                var excDisp = r.compliance.excPct !== null ? ((r.compliance.deficit ? '-' : '+') + r.compliance.excPct + '%') : '—';
+                var measDisp = (r.measured !== null && !isNaN(r.measured)) ? String(r.measured) : '—';
+                var statShort = rc === 'ok' ? 'COMPLIANT' : rc === 'warn' ? 'WARNING' : rc === 'fail' ? 'NON-COMPLIANT' : 'N/M';
+                var cells = [r.name, r.unit || '—', r.limitDisp, measDisp, excDisp, statShort];
+                cells.forEach(function(c, i) {
+                    doc.text(String(c).substring(0, i === 0 ? 28 : 18), colX[i] + 1.5, y + 4.8);
+                });
+                y += rh;
+                if (y > 265) { doc.addPage(); y = 14; }
+            });
+
+            // Summary line
+            y += 5;
+            var nF = wulCurrentResults.filter(function(r){ return r.compliance.code === 'fail'; }).length;
+            var nW = wulCurrentResults.filter(function(r){ return r.compliance.code === 'warn'; }).length;
+            doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+            doc.text('Summary: ' + wulCurrentResults.length + ' parameters assessed | ' + nF + ' non-compliant | ' + nW + ' warning | ' + (wulCurrentResults.length - nF - nW) + ' compliant', mg, y);
+            y += 8;
+
+            // Findings
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+            doc.text('Major Findings:', mg, y); y += 5;
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+            var findEl = document.getElementById('wulFindingsText');
+            var findTxt = findEl ? findEl.innerText : '';
+            var lines = doc.splitTextToSize(findTxt, cw);
+            lines.forEach(function(ln) {
+                doc.text(ln, mg, y); y += 4.5;
+                if (y > 275) { doc.addPage(); y = 14; }
+            });
+
+            // Footer
+            doc.setFontSize(7); doc.setTextColor(150,150,150);
+            doc.text('Green Scorpions Environmental Compliance Portal | DFFE', pw/2, 292, { align: 'center' });
+
+            var fname = 'WUL_Compliance_' + (m.facility || 'Assessment').replace(/\s+/g, '_') + '_' + (m.date || 'date') + '.pdf';
+            doc.save(fname);
+        }
+
 
         // Initialize app when page loads
     </script>
