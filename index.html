@@ -2829,7 +2829,7 @@
 
                                 <!-- River Network Import Section -->
                                 <div id="riverNetworkImportSection" style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #e8f4fd, #d0e8f8); border-radius: 12px; border: 2px solid #2471a3;">
-                                    <h4 style="margin: 0 0 8px 0; color: #1a5276;">📏 River Study Site Distance Assessment</h4>
+                                    <h4 style="margin: 0 0 8px 0; color: #1a5276;">📏 River Study Site Distance Assessment <span style="font-weight: 400; font-size: 0.85rem; opacity: 0.75;">(Optional)</span></h4>
                                     <p style="font-size: 0.88rem; color: #555; margin-bottom: 4px;">
                                         Import your sample sites from a CSV file, view them on a satellite map, then manually trace the river path between sites to measure distances. Assign each measured distance to a site number to populate the monitoring form below.
                                     </p>
@@ -2868,11 +2868,16 @@
                                                     <button onclick="finishSdaDrawing()" id="sdaBtnFinish" style="padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.88rem; background: #2471a3; color: white; min-height: 38px; display: none;">✅ Finish &amp; Assign</button>
                                                 </div>
                                                 <div id="sdaLiveDistance" style="font-size: 0.9rem; color: #1a5276; font-weight: 600; min-height: 22px;"></div>
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid #dde2e8;">
+                                                    <div id="sdaCumulativeDisplay" style="font-size: 0.88rem; color: #555;">📍 Cumulative from source: <strong>0.000 km</strong></div>
+                                                    <button onclick="resetSdaCumulative()" style="padding: 4px 11px; border: 1px solid #aed6f1; border-radius: 6px; cursor: pointer; font-size: 0.78rem; font-weight: 600; background: white; color: #c0392b;">↺ Reset Cumulative</button>
+                                                </div>
                                             </div>
                                         </div>
                                         <div id="sdaAssignPanel" style="display: none; background: white; border-radius: 10px; padding: 15px; margin-bottom: 14px; border: 2px solid #27ae60;">
                                             <div style="font-weight: 700; color: #1e8449; margin-bottom: 10px; font-size: 0.95rem;">Step 3 — Assign Distance to Site</div>
-                                            <div id="sdaAssignDistance" style="font-size: 1.05rem; font-weight: 700; color: #2c3e50; margin-bottom: 12px;"></div>
+                                            <div id="sdaAssignSegment" style="font-size: 0.95rem; color: #555; margin-bottom: 4px;"></div>
+                                            <div id="sdaAssignDistance" style="font-size: 1.05rem; font-weight: 700; color: #1e8449; margin-bottom: 12px;"></div>
                                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                                                 <div>
                                                     <label style="font-size: 0.85rem; font-weight: 700; color: #2c3e50; display: block; margin-bottom: 5px;">Assign to Site Number:</label>
@@ -4578,6 +4583,21 @@
                     </div>
                 </div>
             `);
+
+            // Auto-fill site names from CSV and distances from SDA assignments
+            for (var si = 1; si <= numSites; si++) {
+                var nameEl = document.getElementById('riverSite_' + si + '_name');
+                var distEl = document.getElementById('riverSite_' + si + '_distance');
+                // Apply CSV site name (if CSV was loaded)
+                if (nameEl && sdaSites && sdaSites[si-1] && !nameEl.value) {
+                    nameEl.value = sdaSites[si-1].name;
+                }
+                // Apply SDA assignment if exists (cumulative distance + possible label override)
+                if (sdaAssignments && sdaAssignments[si]) {
+                    if (distEl) distEl.value = sdaAssignments[si].distance;
+                    if (nameEl && sdaAssignments[si].label) nameEl.value = sdaAssignments[si].label;
+                }
+            }
         }
 
         function addRiverSample(siteNum) {
@@ -5429,8 +5449,9 @@
         var sdaDrawPoints  = [];
         var sdaPolyline    = null;
         var sdaTempMarkers = [];
-        var sdaAssignments = {};        // { siteNum: { distance, label } }
-        var sdaCurrentDist = 0;
+        var sdaAssignments = {};        // { siteNum: { distance (cumulative), segment, label } }
+        var sdaCurrentDist = 0;         // segment distance being drawn right now
+        var sdaCumulativeDist = 0;      // running total from source across all assigned segments
         var sdaTileLayerOsm = null;
         var sdaTileLayerSat = null;
         var sdaCurrentLayer = 'satellite';
@@ -5462,7 +5483,9 @@
                     if (errors.length) alert('CSV warnings:\n' + errors.join('\n'));
                     if (!sites.length) throw new Error('No valid sites found.');
                     sdaSites = sites;
-                    document.getElementById('sdaCsvStatus').innerHTML = '<span style="color:#1e8449; font-weight:600;">✅ ' + sites.length + ' site(s) loaded: ' + sites.map(function(s){return s.name;}).join(', ') + '</span>';
+                    // Auto-set the number of monitoring sites
+                    document.getElementById('numRiverSites').value = sites.length;
+                    document.getElementById('sdaCsvStatus').innerHTML = '<span style="color:#1e8449; font-weight:600;">✅ ' + sites.length + ' site(s) loaded — Number of Sites set to ' + sites.length + '. Sites: ' + sites.map(function(s){return s.name;}).join(', ') + '</span>';
                     initSdaMap();
                 } catch(err) {
                     document.getElementById('sdaCsvStatus').innerHTML = '<span style="color:#c0392b; font-weight:600;">❌ ' + err.message + '</span>';
@@ -5627,19 +5650,34 @@
             sdaDrawing = false;
             document.getElementById('sdaMap').style.cursor = '';
 
-            // Build assign panel
+            var cumulative = sdaCumulativeDist + sdaCurrentDist;
+
+            // Build assign panel dropdown — use CSV names if available
             var numSites = parseInt(document.getElementById('numRiverSites').value) || 10;
             var sel = document.getElementById('sdaSiteNumSelect');
             sel.innerHTML = '<option value="">— Select site number —</option>';
             for (var i = 1; i <= numSites; i++) {
-                sel.innerHTML += '<option value="' + i + '">Site ' + i + '</option>';
+                var siteName = (sdaSites && sdaSites[i-1]) ? sdaSites[i-1].name : '';
+                var label = siteName ? 'Site ' + i + ': ' + siteName : 'Site ' + i;
+                sel.innerHTML += '<option value="' + i + '">' + label + '</option>';
             }
 
-            // Pre-fill label from CSV if matching
-            document.getElementById('sdaSiteLabel').value = '';
+            // Auto-fill label from next unassigned CSV site
+            var nextUnassigned = '';
+            for (var j = 1; j <= numSites; j++) {
+                if (!sdaAssignments[j] && sdaSites && sdaSites[j-1]) {
+                    nextUnassigned = sdaSites[j-1].name;
+                    sel.value = j;
+                    break;
+                }
+            }
+            document.getElementById('sdaSiteLabel').value = nextUnassigned;
 
+            document.getElementById('sdaAssignSegment').innerHTML =
+                '📏 This segment: <strong>' + sdaCurrentDist.toFixed(3) + ' km</strong>';
             document.getElementById('sdaAssignDistance').innerHTML =
-                '📏 Measured distance: <strong>' + sdaCurrentDist.toFixed(3) + ' km</strong> (' + sdaDrawPoints.length + ' points)';
+                '📍 Cumulative from source if assigned here: <strong>' + cumulative.toFixed(3) + ' km</strong>';
+
             document.getElementById('sdaAssignPanel').style.display = 'block';
             document.getElementById('sdaBtnStart').style.display = 'inline-block';
             document.getElementById('sdaBtnUndo').style.display = 'none';
@@ -5653,12 +5691,20 @@
             var label   = document.getElementById('sdaSiteLabel').value.trim();
             if (!siteNum) { alert('Please select a site number.'); return; }
 
-            sdaAssignments[siteNum] = { distance: sdaCurrentDist.toFixed(3), label: label };
+            // Add segment to running cumulative total
+            sdaCumulativeDist += sdaCurrentDist;
+            var cumulativeVal = sdaCumulativeDist;
 
-            // If the river sites form already exists, populate it immediately
+            sdaAssignments[siteNum] = {
+                distance: cumulativeVal.toFixed(3),
+                segment:  sdaCurrentDist.toFixed(3),
+                label:    label
+            };
+
+            // Write cumulative value into the form if it exists
             var distEl = document.getElementById('riverSite_' + siteNum + '_distance');
             var nameEl = document.getElementById('riverSite_' + siteNum + '_name');
-            if (distEl) distEl.value = sdaCurrentDist.toFixed(3);
+            if (distEl) distEl.value = cumulativeVal.toFixed(3);
             if (nameEl && label) nameEl.value = label;
 
             // Keep the polyline on map as a record (light blue)
@@ -5669,9 +5715,13 @@
             sdaTempMarkers.forEach(function(m) { sdaMap.removeLayer(m); });
             sdaTempMarkers = [];
 
+            // Update cumulative display
+            var cumDisp = document.getElementById('sdaCumulativeDisplay');
+            if (cumDisp) cumDisp.innerHTML = '📍 Cumulative from source: <strong>' + cumulativeVal.toFixed(3) + ' km</strong>';
+
             document.getElementById('sdaAssignPanel').style.display = 'none';
             document.getElementById('sdaLiveDistance').innerHTML =
-                '✅ <strong>' + sdaCurrentDist.toFixed(3) + ' km</strong> assigned to Site ' + siteNum + (label ? ' (' + label + ')' : '') + '. Draw another line or proceed to the form below.';
+                '✅ Site ' + siteNum + (label ? ' (' + label + ')' : '') + ' — Segment: ' + sdaCurrentDist.toFixed(3) + ' km, Cumulative: <strong>' + cumulativeVal.toFixed(3) + ' km</strong>. Draw next segment or proceed below.';
 
             updateSdaTable();
         }
@@ -5689,12 +5739,13 @@
             document.getElementById('sdaAssignmentsContainer').style.display = 'block';
             keys.sort(function(a,b){ return parseInt(a)-parseInt(b); });
             var html = '<table style="width:100%; border-collapse:collapse; font-size:0.88rem;">';
-            html += '<tr style="background:#eaf4fb;"><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Site #</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Label</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Distance (km)</th><th style="padding:8px 10px; border-bottom:2px solid #aed6f1;"></th></tr>';
+            html += '<tr style="background:#eaf4fb;"><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Site #</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Name</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Segment (km)</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Cumulative (km)</th><th style="padding:8px 10px; border-bottom:2px solid #aed6f1;"></th></tr>';
             keys.forEach(function(k) {
                 var a = sdaAssignments[k];
                 html += '<tr style="border-bottom:1px solid #e8eef3;">'
                     + '<td style="padding:7px 10px; font-weight:700; color:#1a5276;">Site ' + k + '</td>'
                     + '<td style="padding:7px 10px; color:#555;">' + (a.label || '—') + '</td>'
+                    + '<td style="padding:7px 10px; color:#888;">' + (a.segment || '—') + '</td>'
                     + '<td style="padding:7px 10px; font-weight:700; color:#1e8449;">' + a.distance + ' km</td>'
                     + '<td style="padding:7px 10px; text-align:right;"><button onclick="removeSdaAssignment(' + k + ')" style="background:#e74c3c; color:white; border:none; padding:3px 9px; border-radius:5px; cursor:pointer; font-size:0.8rem;">✕</button></td>'
                     + '</tr>';
@@ -5709,9 +5760,20 @@
         }
 
         function clearAllSdaDistances() {
-            if (!confirm('Clear all assigned distances?')) return;
+            if (!confirm('Clear all assigned distances and reset cumulative to 0?')) return;
             sdaAssignments = {};
+            sdaCumulativeDist = 0;
+            var cumDisp = document.getElementById('sdaCumulativeDisplay');
+            if (cumDisp) cumDisp.innerHTML = '📍 Cumulative from source: <strong>0.000 km</strong>';
             updateSdaTable();
+        }
+
+        function resetSdaCumulative() {
+            if (!confirm('Reset cumulative distance to 0? Assigned site distances will not be changed.')) return;
+            sdaCumulativeDist = 0;
+            var cumDisp = document.getElementById('sdaCumulativeDisplay');
+            if (cumDisp) cumDisp.innerHTML = '📍 Cumulative from source: <strong>0.000 km</strong>';
+            document.getElementById('sdaLiveDistance').textContent = 'Cumulative reset to 0. Start drawing the next segment.';
         }
 
         function sdaHaversine(lat1, lon1, lat2, lon2) {
