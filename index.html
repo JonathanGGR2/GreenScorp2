@@ -9805,6 +9805,18 @@
                 return '<option value="' + key + '">' + p.icon + ' ' + p.name + ' (' + p.unit + ')</option>';
             }).join('');
 
+            // Pill buttons for multi-select
+            const pillsHTML = Object.entries(fieldParameters).map(function(entry) {
+                var key = entry[0]; var p = entry[1];
+                var short = p.name.length > 14 ? p.name.substring(0,13) + '..' : p.name;
+                return '<button type="button" data-param-pill="1" data-param-key="' + key + '" data-selected="false"'
+                    + ' id="' + siteId + '_pill_' + key + '"'
+                    + ' onclick="toggleParamPill(\'' + siteId + '\', \'' + key + '\')"'
+                    + ' style="padding:6px 10px; border:2px solid #dde2e8; border-radius:20px; background:white;'
+                    + ' color:#2c3e50; font-size:0.78rem; font-weight:600; cursor:pointer; white-space:nowrap; min-height:34px;">'
+                    + p.icon + ' ' + short + '</button>';
+            }).join('');
+
             return '\
                 <!-- CARD HEADER -->\
                 <div onclick="toggleSiteCard(\'' + siteId + '\')" style="\
@@ -9885,18 +9897,26 @@
                     </div>\
                     <!-- PARAMETERS -->\
                     <div style="background: #f4f6f8; padding: 15px; border-radius: 12px; margin-bottom: 13px; border: 1px solid #dde2e8;">\
-                        <div style="font-weight: 700; color: #2c3e50; margin-bottom: 11px; font-size: 0.95rem;">📊 Field Parameters</div>\
-                        <div style="display: flex; gap: 8px; margin-bottom: 11px;">\
-                            <select id="' + siteId + '_paramSelect" style="flex: 1; padding: 12px; border: 2px solid #dde2e8; border-radius: 9px; font-size: 0.93rem; background: white; min-height: 48px;">\
-                                <option value="">— Select parameter —</option>\
-                                ' + paramOptions + '\
-                                <option value="other">✏️ Other (custom)</option>\
-                            </select>\
-                            <button onclick="addFieldParameter(\'' + siteId + '\')" style="\
-                                padding: 12px 18px; border: none; border-radius: 9px;\
-                                background: #2471a3; color: white; font-weight: 700;\
-                                font-size: 1.05rem; cursor: pointer; min-height: 48px; flex-shrink: 0;">\
-                                ➕\
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">\
+                            <div style="font-weight: 700; color: #2c3e50; font-size: 0.95rem;">📊 Field Parameters</div>\
+                            <span id="' + siteId + '_paramCounter" style="font-size:0.78rem; color:#888;">0/10 selected</span>\
+                        </div>\
+                        <div style="font-size:0.8rem; color:#777; margin-bottom:10px;">Tap parameters to select, then tap Add Selected (max 10)</div>\
+                        <div id="' + siteId + '_paramPills" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">\
+                            ' + pillsHTML + '\
+                        </div>\
+                        <div style="display:flex; gap:8px; margin-bottom:11px;">\
+                            <button onclick="addSelectedParameters(\'' + siteId + '\')" style="\
+                                flex:1; padding: 11px; border: none; border-radius: 9px;\
+                                background: #27ae60; color: white; font-weight: 700;\
+                                font-size: 0.9rem; cursor: pointer; min-height: 46px;">\
+                                ➕ Add Selected\
+                            </button>\
+                            <button onclick="addFieldParameter(\'' + siteId + '\', \'other\')" style="\
+                                padding: 11px 16px; border: none; border-radius: 9px;\
+                                background: #e67e22; color: white; font-weight: 700;\
+                                font-size: 0.9rem; cursor: pointer; min-height: 46px;">\
+                                ✏️ Other\
                             </button>\
                         </div>\
                         <div id="' + siteId + '_parameters" style="display: flex; flex-direction: column; gap: 9px;"></div>\
@@ -10044,9 +10064,55 @@
             );
         }
 
-        function addFieldParameter(siteId) {
-            var select   = document.getElementById(siteId + '_paramSelect');
-            var paramKey = select.value;
+        function toggleParamPill(siteId, key) {
+            var pill = document.getElementById(siteId + '_pill_' + key);
+            if (!pill) return;
+            var selected = pill.getAttribute('data-selected') === 'true';
+            // Check 10-cap before selecting
+            if (!selected) {
+                var pills = document.querySelectorAll('#' + siteId + '_paramPills [data-param-pill]');
+                var count = Array.from(pills).filter(function(p){ return p.getAttribute('data-selected') === 'true'; }).length;
+                if (count >= 10) { alert('Maximum 10 parameters per site.'); return; }
+            }
+            var nowSelected = !selected;
+            pill.setAttribute('data-selected', nowSelected);
+            pill.style.background   = nowSelected ? '#27ae60' : 'white';
+            pill.style.color        = nowSelected ? 'white'   : '#2c3e50';
+            pill.style.borderColor  = nowSelected ? '#27ae60' : '#dde2e8';
+            // Update counter
+            var allPills = document.querySelectorAll('#' + siteId + '_paramPills [data-param-pill]');
+            var newCount = Array.from(allPills).filter(function(p){ return p.getAttribute('data-selected') === 'true'; }).length;
+            var counter  = document.getElementById(siteId + '_paramCounter');
+            if (counter) counter.textContent = newCount + '/10 selected';
+        }
+
+        function addSelectedParameters(siteId) {
+            var pills  = document.querySelectorAll('#' + siteId + '_paramPills [data-param-pill]');
+            var added  = 0;
+            pills.forEach(function(pill) {
+                if (pill.getAttribute('data-selected') === 'true') {
+                    var key = pill.getAttribute('data-param-key');
+                    addFieldParameter(siteId, key);
+                    added++;
+                    // Reset pill
+                    pill.setAttribute('data-selected', 'false');
+                    pill.style.background  = 'white';
+                    pill.style.color       = '#2c3e50';
+                    pill.style.borderColor = '#dde2e8';
+                }
+            });
+            var counter = document.getElementById(siteId + '_paramCounter');
+            if (counter) counter.textContent = '0/10 selected';
+            if (added === 0) alert('No parameters selected. Tap parameter buttons first.');
+        }
+
+        function addFieldParameter(siteId, paramKey) {
+            if (!paramKey) return;
+            // Legacy fallback: if called without key, try select element
+            if (!paramKey) {
+                var sel = document.getElementById(siteId + '_paramSelect');
+                if (sel) paramKey = sel.value;
+            }
             if (!paramKey) return;
 
             var container = document.getElementById(siteId + '_parameters');
@@ -10129,25 +10195,26 @@
 
             var img = new Image();
             img.onload = function() {
-                var canvas       = document.createElement('canvas');
-                canvas.width     = img.width;
-                canvas.height    = img.height;
-                var ctx          = canvas.getContext('2d');
+                var canvas   = document.createElement('canvas');
+                canvas.width  = img.width;
+                canvas.height = img.height;
+                var ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0);
 
+                // All dimensions doubled from original
                 var scale   = img.width / 1000;
-                var pad     = Math.round(8 * scale);
-                var gap     = Math.round(4 * scale);
-                var logoH   = Math.round(36 * scale);
-                var lineH   = Math.round(15 * scale);
-                var boxW    = Math.round(160 * scale);
-                var boxH    = pad + logoH + gap + Math.round(1 * scale) + gap + lineH + gap + lineH + gap + lineH + pad;
-                var margin  = Math.round(10 * scale);
+                var pad     = Math.round(16 * scale);
+                var gap     = Math.round(8  * scale);
+                var logoH   = Math.round(72 * scale);
+                var lineH   = Math.round(30 * scale);
+                var boxW    = Math.round(320 * scale);
+                var boxH    = pad + logoH + gap + Math.round(2 * scale) + gap + lineH + gap + lineH + gap + lineH + pad;
+                var margin  = Math.round(14 * scale);
                 var bx      = margin;
                 var by      = img.height - boxH - margin;
-                var r       = Math.round(5 * scale);
+                var r       = Math.round(8 * scale);
 
-                // Rounded rect box
+                // Semi-transparent white box
                 ctx.save();
                 ctx.beginPath();
                 ctx.moveTo(bx + r, by);
@@ -10164,46 +10231,73 @@
                 ctx.fill();
                 ctx.restore();
 
-                // Logo
-                var logoX = bx + pad;
-                var logoY = by + pad;
-                var logoW = boxW - pad * 2;
+                // ── LOGO (left portion of header row) ──────────────────────
+                var logoX       = bx + pad;
+                var logoY       = by + pad;
+                var logoAlloc   = Math.round(boxW * 0.38);  // 38% of box width for logo
+                var pipeX       = logoX + logoAlloc + gap;
+
                 if (gsLogoImg && gsLogoImg.complete && gsLogoImg.naturalWidth > 0) {
                     var aspect   = gsLogoImg.naturalWidth / gsLogoImg.naturalHeight;
-                    var drawW    = Math.min(logoW, logoH * aspect);
+                    var drawW    = Math.min(logoAlloc, logoH * aspect);
                     var drawH    = drawW / aspect;
-                    ctx.drawImage(gsLogoImg, logoX, logoY, drawW, drawH);
+                    ctx.drawImage(gsLogoImg, logoX, logoY + (logoH - drawH) / 2, drawW, drawH);
                 } else {
+                    // Fallback green block
                     ctx.fillStyle = 'rgba(44,86,48,0.85)';
-                    ctx.fillRect(logoX, logoY, logoW, logoH);
+                    ctx.fillRect(logoX, logoY, logoAlloc, logoH);
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold ' + Math.round(9 * scale) + 'px Arial';
+                    ctx.font = 'bold ' + Math.round(14 * scale) + 'px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText('GREEN SCORPIONS', logoX + logoW / 2, logoY + logoH * 0.65);
+                    ctx.fillText('GS', logoX + logoAlloc / 2, logoY + logoH * 0.65);
                     ctx.textAlign = 'left';
                 }
 
-                // Divider
+                // ── PIPE SEPARATOR ─────────────────────────────────────────
+                ctx.strokeStyle = 'rgba(44,86,48,0.60)';
+                ctx.lineWidth   = Math.max(2, Math.round(2 * scale));
+                ctx.beginPath();
+                ctx.moveTo(pipeX, logoY + Math.round(4 * scale));
+                ctx.lineTo(pipeX, logoY + logoH - Math.round(4 * scale));
+                ctx.stroke();
+
+                // ── TOOL NAME (right of pipe) ───────────────────────────────
+                var textRightX  = pipeX + gap * 2;
+                var fsLogo1     = Math.max(16, Math.round(22 * scale));   // "GreenScorp"
+                var fsLogo2     = Math.max(13, Math.round(18 * scale));   // "Tool"
+                var totalTxtH   = fsLogo1 + gap + fsLogo2;
+                var txtStartY   = logoY + (logoH - totalTxtH) / 2 + fsLogo1;
+
+                ctx.fillStyle   = 'rgba(30,60,34,0.90)';
+                ctx.textAlign   = 'left';
+                ctx.font        = 'bold ' + fsLogo1 + 'px Arial';
+                ctx.fillText('GreenScorp', textRightX, txtStartY);
+                ctx.font        = fsLogo2 + 'px Arial';
+                ctx.fillStyle   = 'rgba(50,80,55,0.80)';
+                ctx.fillText('Tool', textRightX, txtStartY + gap + fsLogo2);
+
+                // ── DIVIDER below header row ───────────────────────────────
                 var divY = logoY + logoH + gap;
-                ctx.strokeStyle = 'rgba(0,0,0,0.28)';
-                ctx.lineWidth   = Math.max(1, scale * 0.7);
+                ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+                ctx.lineWidth   = Math.max(1, Math.round(scale));
                 ctx.beginPath();
                 ctx.moveTo(bx + pad, divY);
                 ctx.lineTo(bx + boxW - pad, divY);
                 ctx.stroke();
 
-                // Text
-                ctx.fillStyle = 'rgba(0,0,0,0.87)';
-                ctx.textAlign = 'left';
-                var fs  = Math.max(10, Math.round(11.5 * scale));
-                var fss = Math.max(9,  Math.round(10 * scale));
-                var ty  = divY + gap + fs;
-                ctx.font = 'bold ' + fs + 'px Arial';
+                // ── TEXT LINES ─────────────────────────────────────────────
+                ctx.fillStyle   = 'rgba(0,0,0,0.87)';
+                ctx.textAlign   = 'left';
+                var fs          = Math.max(18, Math.round(23 * scale));
+                var fss         = Math.max(16, Math.round(20 * scale));
+                var ty          = divY + gap + fs;
+
+                ctx.font        = 'bold ' + fs + 'px Arial';
                 ctx.fillText(nameDisp, bx + pad, ty);
-                ty += lineH + gap;
-                ctx.font = fss + 'px Arial';
+                ty += lineH + gap * 0.5;
+                ctx.font        = fss + 'px Arial';
                 ctx.fillText(latDisp + ',  ' + lonDisp, bx + pad, ty);
-                ty += lineH + gap;
+                ty += lineH + gap * 0.5;
                 ctx.fillText(dtDisplay, bx + pad, ty);
 
                 callback(canvas.toDataURL('image/jpeg', 0.92));
@@ -10342,8 +10436,7 @@
 
                     (siteData.parameters || []).forEach(function(p) {
                         if (p.parameter === 'other') {
-                            var sel = document.getElementById(siteId + '_paramSelect');
-                            if (sel) { sel.value = 'other'; addFieldParameter(siteId); }
+                            addFieldParameter(siteId, 'other');
                             var onEl  = document.getElementById(siteId + '_otherName');
                             var ouEl  = document.getElementById(siteId + '_otherUnit');
                             var ovEl  = document.getElementById(siteId + '_value_other');
@@ -10353,10 +10446,7 @@
                             if (ovEl)  ovEl.value  = p.value;
                             if (onote) onote.value = p.note;
                         } else {
-                            var sel2 = document.getElementById(siteId + '_paramSelect');
-                            if (!sel2) return;
-                            sel2.value = p.parameter;
-                            addFieldParameter(siteId);
+                            addFieldParameter(siteId, p.parameter);
                             var vEl = document.getElementById(siteId + '_value_' + p.parameter);
                             var nEl = document.getElementById(siteId + '_note_' + p.parameter);
                             if (vEl) vEl.value = p.value;
@@ -10656,6 +10746,14 @@
                     labelRow('Date / Time',  dt),
                     labelRow('Sampled by',   (reviewData && reviewData.exportedBy) || currentUser || 'Green Scorpions EMI'),
                 ]}));
+
+                // Sampled Parameters summary line
+                if (site.parameters && site.parameters.length) {
+                    var paramNames = site.parameters.map(function(p){ return p.name || p.parameter; }).join(', ');
+                    all.push(new D.Paragraph({ spacing: { before: 220, after: 60 },
+                        children: [new D.TextRun({ text: 'Sampled Parameters: ', bold: true, size: 20, font: 'Arial', color: '1A3C2A' }),
+                                   new D.TextRun({ text: paramNames, size: 20, font: 'Arial', color: '333333' })] }));
+                }
 
                 // Field notes
                 if (site.fieldNotes && site.fieldNotes.trim()) {
