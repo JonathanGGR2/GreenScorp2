@@ -2828,122 +2828,1175 @@
                                 </div>
 
                                 <!-- River Network Import Section -->
-                                <div id="riverNetworkImportSection" style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #e8f5e9, #c8e6c9); border-radius: 12px; border: 2px solid #4caf50;">
-                                    <h4 style="margin: 0 0 15px 0; color: #2e7d32;">🗺️ Import River Network & Sample Sites (Optional)</h4>
-                                    <p style="font-size: 0.9rem; color: #555; margin-bottom: 15px;">
-                                        Upload your river network and GPS sample sites to automatically calculate distances and populate site information.
+                                <div id="riverNetworkImportSection" style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #e8f4fd, #d0e8f8); border-radius: 12px; border: 2px solid #2471a3;">
+                                    <h4 style="margin: 0 0 8px 0; color: #1a5276;">📏 River Study Site Distance Assessment</h4>
+                                    <p style="font-size: 0.88rem; color: #555; margin-bottom: 4px;">
+                                        Import your sample sites from a CSV file, view them on a satellite map, then manually trace the river path between sites to measure distances. Assign each measured distance to a site number to populate the monitoring form below.
                                     </p>
-                                    
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                        <div>
-                                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #2c3e50;">
-                                                📁 River Network (JSON/GeoJSON)
-                                            </label>
-                                            <input type="file" id="riverNetworkFile" accept=".json,.geojson" 
-                                                   onchange="loadRiverNetwork(event)"
-                                                   style="width: 100%; padding: 10px; border: 2px solid #4caf50; border-radius: 8px; background: white;">
-                                            <div id="networkFileStatus" style="margin-top: 5px; font-size: 0.85rem; color: #666;"></div>
+                                    <p style="font-size: 0.82rem; color: #7d6608; background: #fef9e7; border-left: 3px solid #f39c12; padding: 7px 10px; border-radius: 5px; margin-bottom: 15px;">
+                                        ⚠️ Distances are manually traced on the map and are indicative only. They are not survey-grade measurements. Accuracy depends on tracing precision and map zoom level.
+                                    </p>
+
+                                    <!-- CSV IMPORT -->
+                                    <div style="background: white; border-radius: 10px; padding: 15px; margin-bottom: 14px; border: 1px solid #aed6f1;">
+                                        <div style="font-weight: 700; color: #1a5276; margin-bottom: 10px; font-size: 0.95rem;">Step 1 — Import Sample Sites (CSV)</div>
+                                        <div style="font-size: 0.83rem; color: #555; margin-bottom: 10px;">
+                                            CSV must have three columns in this exact order: <code style="background:#f4f6f8; padding:2px 5px; border-radius:4px;">name,latitude,longitude</code><br>
+                                            Example: <code style="background:#f4f6f8; padding:2px 5px; border-radius:4px;">Pollution_Source,-33.9271,18.4622</code>
                                         </div>
-                                        
-                                        <div>
-                                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #2c3e50;">
-                                                📍 Sample Sites GPS (JSON or CSV)
-                                            </label>
-                                            <input type="file" id="sampleSitesFile" accept=".json,.csv" 
-                                                   onchange="loadSampleSites(event)"
-                                                   style="width: 100%; padding: 10px; border: 2px solid #4caf50; border-radius: 8px; background: white;">
-                                            <div id="sitesFileStatus" style="margin-top: 5px; font-size: 0.85rem; color: #666;"></div>
-                                            
-                                            <div style="margin-top: 10px;">
-                                                <button onclick="showCSVFormatGuide()" 
-                                                        style="padding: 6px 12px; background: #e3f2fd; border: 1px solid #2196F3; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
-                                                    📋 CSV Format Guide & Template
+                                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                                            <input type="file" id="sdaCsvInput" accept=".csv"
+                                                onchange="loadSiteDistanceCSV(event)"
+                                                style="flex: 1; min-width: 200px; padding: 9px; border: 2px solid #aed6f1; border-radius: 8px; background: white; font-size: 0.9rem;">
+                                            <button onclick="downloadDistanceCsvTemplate()"
+                                                style="padding: 9px 16px; background: #2471a3; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.88rem; white-space: nowrap;">
+                                                📥 Download Template
+                                            </button>
+                                        </div>
+                                        <div id="sdaCsvStatus" style="margin-top: 8px; font-size: 0.85rem; color: #555;"></div>
+                                    </div>
+
+                                    <!-- MAP -->
+                                    <div id="sdaMapContainer" style="display: none;">
+                                        <div style="background: white; border-radius: 10px; padding: 15px; margin-bottom: 14px; border: 1px solid #aed6f1;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                                                <div style="font-weight: 700; color: #1a5276; font-size: 0.95rem;">Step 2 — Map &amp; Distance Ruler</div>
+                                                <div style="display: flex; gap: 6px;">
+                                                    <button onclick="toggleSdaLayer('satellite')" id="sdaBtnSat"
+                                                        style="padding: 6px 12px; border: 2px solid #2471a3; border-radius: 7px; cursor: pointer; font-size: 0.82rem; font-weight: 600; background: #2471a3; color: white;">
+                                                        🛰️ Satellite
+                                                    </button>
+                                                    <button onclick="toggleSdaLayer('osm')" id="sdaBtnOsm"
+                                                        style="padding: 6px 12px; border: 2px solid #aed6f1; border-radius: 7px; cursor: pointer; font-size: 0.82rem; font-weight: 600; background: white; color: #2471a3;">
+                                                        🗺️ Street Map
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div id="sdaMap" style="height: 420px; border-radius: 8px; border: 2px solid #dde2e8; cursor: crosshair;"></div>
+
+                                            <!-- DRAWING CONTROLS -->
+                                            <div style="margin-top: 12px; padding: 12px; background: #f4f6f8; border-radius: 9px; border: 1px solid #dde2e8;">
+                                                <div style="font-weight: 700; color: #2c3e50; margin-bottom: 8px; font-size: 0.9rem;">📐 Distance Ruler</div>
+                                                <div style="font-size: 0.82rem; color: #666; margin-bottom: 10px;" id="sdaDrawInstructions">
+                                                    Click <strong>Start Drawing</strong>, then click points along the river channel on the map. Each click adds a vertex. Click <strong>Finish</strong> when done.
+                                                </div>
+                                                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+                                                    <button onclick="startSdaDrawing()" id="sdaBtnStart"
+                                                        style="padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.88rem; background: #27ae60; color: white; min-height: 38px;">
+                                                        ✏️ Start Drawing
+                                                    </button>
+                                                    <button onclick="undoSdaPoint()" id="sdaBtnUndo"
+                                                        style="padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.88rem; background: #f39c12; color: white; min-height: 38px; display: none;">
+                                                        ↩ Undo Last Point
+                                                    </button>
+                                                    <button onclick="clearSdaDrawing()" id="sdaBtnClear"
+                                                        style="padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.88rem; background: #c0392b; color: white; min-height: 38px; display: none;">
+                                                        🗑️ Clear
+                                                    </button>
+                                                    <button onclick="finishSdaDrawing()" id="sdaBtnFinish"
+                                                        style="padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.88rem; background: #2471a3; color: white; min-height: 38px; display: none;">
+                                                        ✅ Finish &amp; Assign
+                                                    </button>
+                                                </div>
+                                                <div id="sdaLiveDistance" style="font-size: 0.9rem; color: #1a5276; font-weight: 600; min-height: 22px;"></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- ASSIGN DISTANCE PANEL -->
+                                        <div id="sdaAssignPanel" style="display: none; background: white; border-radius: 10px; padding: 15px; margin-bottom: 14px; border: 2px solid #27ae60;">
+                                            <div style="font-weight: 700; color: #1e8449; margin-bottom: 10px; font-size: 0.95rem;">Step 3 — Assign Distance to Site</div>
+                                            <div id="sdaAssignDistance" style="font-size: 1.05rem; font-weight: 700; color: #2c3e50; margin-bottom: 12px;"></div>
+                                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                                <div>
+                                                    <label style="font-size: 0.85rem; font-weight: 700; color: #2c3e50; display: block; margin-bottom: 5px;">Assign to Site Number:</label>
+                                                    <select id="sdaSiteNumSelect" style="width: 100%; padding: 10px; border: 2px solid #dde2e8; border-radius: 8px; font-size: 0.95rem; background: white;">
+                                                        <option value="">— Select site number —</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label style="font-size: 0.85rem; font-weight: 700; color: #2c3e50; display: block; margin-bottom: 5px;">Site Label (optional override):</label>
+                                                    <input type="text" id="sdaSiteLabel" placeholder="e.g. Pollution Source"
+                                                        style="width: 100%; padding: 10px; border: 2px solid #dde2e8; border-radius: 8px; font-size: 0.95rem;">
+                                                </div>
+                                            </div>
+                                            <div style="display: flex; gap: 10px;">
+                                                <button onclick="assignSdaDistance()"
+                                                    style="padding: 11px 22px; border: none; border-radius: 9px; cursor: pointer; font-weight: 700; font-size: 0.95rem; background: #27ae60; color: white;">
+                                                    ✅ Import Distance
+                                                </button>
+                                                <button onclick="discardSdaMeasurement()"
+                                                    style="padding: 11px 18px; border: none; border-radius: 9px; cursor: pointer; font-weight: 700; font-size: 0.95rem; background: #c0392b; color: white;">
+                                                    Discard
                                                 </button>
                                             </div>
                                         </div>
-                                    </div>
-                                    
-                                    <!-- CSV Format Guide Modal -->
-                                    <div id="csvFormatGuide" style="display: none; margin-top: 15px; padding: 15px; background: white; border: 2px solid #2196F3; border-radius: 10px;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                            <h5 style="margin: 0; color: #2c3e50;">📋 CSV Format Requirements</h5>
-                                            <button onclick="document.getElementById('csvFormatGuide').style.display='none'" 
-                                                    style="background: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">
-                                                ✕ Close
-                                            </button>
-                                        </div>
-                                        
-                                        <div style="background: #fff3cd; padding: 12px; border-left: 4px solid #ff9800; border-radius: 5px; margin-bottom: 15px;">
-                                            <strong>⚠️ CRITICAL: Your CSV must be formatted EXACTLY as shown below!</strong>
-                                        </div>
-                                        
-                                        <div style="margin-bottom: 15px;">
-                                            <strong style="color: #2c3e50;">Required Format:</strong>
-                                            <pre style="background: #f5f5f5; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: monospace; font-size: 0.9rem; margin-top: 8px;">name,latitude,longitude
-Site A - Upstream,-25.738000,28.177000
-Site B - Confluence,-25.742000,28.182000
-Site C - Midstream,-25.752000,28.192000
-Site D - Tributary,-25.754000,28.196000
-Site E - Downstream,-25.763000,28.203000</pre>
-                                        </div>
-                                        
-                                        <div style="background: #e8f5e9; padding: 12px; border-left: 4px solid #4caf50; border-radius: 5px; margin-bottom: 15px;">
-                                            <strong>✅ Rules:</strong>
-                                            <ul style="margin: 8px 0 0 20px; line-height: 1.6; font-size: 0.9rem;">
-                                                <li><strong>First row MUST be:</strong> <code>name,latitude,longitude</code> (exactly, lowercase)</li>
-                                                <li><strong>No spaces</strong> after commas (unless part of site name)</li>
-                                                <li><strong>Latitude:</strong> Decimal degrees (negative for South)</li>
-                                                <li><strong>Longitude:</strong> Decimal degrees (positive for East)</li>
-                                                <li><strong>Decimals:</strong> Any precision (3-8 decimals typical)</li>
-                                                <li><strong>No extra columns</strong> - only these 3 columns allowed</li>
-                                                <li><strong>Site names:</strong> Can include spaces, hyphens, numbers</li>
-                                            </ul>
-                                        </div>
-                                        
-                                        <div style="background: #ffebee; padding: 12px; border-left: 4px solid #f44336; border-radius: 5px; margin-bottom: 15px;">
-                                            <strong>❌ Common Mistakes:</strong>
-                                            <ul style="margin: 8px 0 0 20px; line-height: 1.6; font-size: 0.9rem;">
-                                                <li>Header with capital letters: <code>Name,Latitude,Longitude</code> ← WRONG!</li>
-                                                <li>Spaces after commas: <code>name, latitude, longitude</code> ← WRONG!</li>
-                                                <li>Wrong order: <code>name,longitude,latitude</code> ← WRONG!</li>
-                                                <li>Extra columns: <code>name,lat,lon,elevation</code> ← WRONG!</li>
-                                                <li>Missing header row ← WRONG!</li>
-                                            </ul>
-                                        </div>
-                                        
-                                        <div style="text-align: center;">
-                                            <button onclick="downloadCSVTemplate()" 
-                                                    style="padding: 12px 25px; background: #4caf50; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 1rem;">
-                                                📥 Download CSV Template
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Map Display -->
-                                    <div id="riverMapContainer" style="display: none; margin-top: 20px;">
-                                        <div style="background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                                            <h5 style="margin: 0 0 10px 0; color: #2c3e50;">Preview: River Network & Sample Sites</h5>
-                                            <div id="riverMap" style="height: 500px; border-radius: 8px; border: 2px solid #ddd;"></div>
-                                            
-                                            <!-- Branch Designation Panel -->
-                                            <div id="branchDesignationPanel" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none;">
-                                                <h5 style="margin: 0 0 10px 0; color: #2c3e50;">🔀 Designate River Branches</h5>
-                                                <p style="font-size: 0.85rem; color: #666; margin-bottom: 10px;">
-                                                    Click on each river branch on the map, then select whether it's a Mainstem or Tributary.
-                                                </p>
-                                                <div id="branchList" style="display: flex; flex-direction: column; gap: 10px;">
-                                                    <!-- Branch items will be added here dynamically -->
-                                                </div>
+
+                                        <!-- ASSIGNED DISTANCES TABLE -->
+                                        <div id="sdaAssignmentsContainer" style="display: none; background: white; border-radius: 10px; padding: 15px; margin-bottom: 14px; border: 1px solid #aed6f1;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                                <div style="font-weight: 700; color: #1a5276; font-size: 0.95rem;">Assigned Distances</div>
+                                                <button onclick="clearAllSdaDistances()"
+                                                    style="padding: 5px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 600; background: #e74c3c; color: white;">
+                                                    Clear All
+                                                </button>
                                             </div>
+                                            <div id="sdaAssignmentsTable"></div>
+                                            <p style="font-size: 0.8rem; color: #888; margin-top: 8px;">These distances will be applied automatically when you click <strong>Generate River Sites Form</strong> below.</p>
                                         </div>
-                                    </div>
-                                    
-                                    <div class="info-box" style="margin-top: 15px; font-size: 0.85rem;">
-                                        <strong>📋 File Format Examples:</strong><br>
-                                        <strong>River Network JSON:</strong> GeoJSON FeatureCollection with LineString geometries<br>
-                                        <strong>Sample Sites JSON:</strong> {"sites": [{"name": "Site A", "latitude": -25.746, "longitude": 28.188}, ...]}
                                     </div>
                                 </div>
+
+                                <div style="text-align: center; margin: 25px 0;">
+                                    <button class="btn-primary" onclick="generateSedimentSampleInputs()" style="padding: 15px 30px; font-size: 1.1rem; background: linear-gradient(135deg, #228B22, #32CD32);">
+                                        📝 Generate Sample Input Form
+                                    </button>
+                                </div>
+
+                                <div id="sedimentSampleInputsContainer" style="margin-top: 30px;"></div>
+
+                                <div id="sedimentMonitoringGraphContainer" style="margin-top: 40px; display: none;">
+                                    <h4>📈 Monitoring Graph</h4>
+                                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                                        <canvas id="sedimentMonitoringChart" style="max-height: 500px;"></canvas>
+                                    </div>
+                                    
+                                    <div id="sedimentMonitoringInterpretation" style="margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #8B4513;">
+                                    </div>
+
+                                    <div style="text-align: center; margin-top: 25px; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                                        <button class="btn-secondary" onclick="downloadSedimentMonitoringGraph('png')" style="padding: 12px 25px;">
+                                            📥 Download as PNG
+                                        </button>
+                                        <button class="btn-secondary" onclick="downloadSedimentMonitoringGraph('pdf')" style="padding: 12px 25px;">
+                                            📥 Download as PDF
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function addSedimentSample() {
+            const container = document.getElementById('sedimentSamplesContainer');
+            
+            // Remove empty state if it exists
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // Find the lowest available sample number
+            const existingNumbers = sedimentSamples.map(sample => sample.number).sort((a, b) => a - b);
+            let newSampleNumber = 1;
+            
+            for (let i = 0; i < existingNumbers.length; i++) {
+                if (existingNumbers[i] === newSampleNumber) {
+                    newSampleNumber++;
+                } else {
+                    break;
+                }
+            }
+
+            sedimentSampleCounter++;
+            const sampleId = `sediment_sample_${sedimentSampleCounter}`;
+
+            const sampleHTML = `
+                <div class="sediment-sample" data-sample-id="${sampleId}" style="background: white; border: 2px solid #D2691E; border-radius: 15px; margin-bottom: 30px; overflow: hidden; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);">
+                    <div class="sample-header" style="background: linear-gradient(135deg, #F5DEB3, #DEB887); padding: 20px 25px; border-bottom: 2px solid #D2691E; display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="font-size: 1.4rem; font-weight: 600; color: #8B4513; margin: 0;">Sediment Sample ${newSampleNumber}</h3>
+                        <button onclick="removeSedimentSample('${sampleId}')" style="background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.3s ease;">
+                            🗑️ Remove Sample
+                        </button>
+                    </div>
+                    
+                    <div class="sample-content" style="padding: 25px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                            <div style="display: flex; flex-direction: column;">
+                                <label style="font-weight: 600; margin-bottom: 8px; color: #8B4513; font-size: 1rem;">Sample ID:</label>
+                                <input type="text" id="${sampleId}_id" placeholder="e.g., SED-001, TAIL-01" style="padding: 12px 15px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; transition: all 0.3s ease; background: #f8f9fa;">
+                            </div>
+                            
+                            <div style="display: flex; flex-direction: column;">
+                                <label style="font-weight: 600; margin-bottom: 8px; color: #8B4513; font-size: 1rem;">Source/Location:</label>
+                                <input type="text" id="${sampleId}_source" placeholder="e.g., Tailings dump, Contaminated soil, Mining area" style="padding: 12px 15px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; transition: all 0.3s ease; background: #f8f9fa;">
+                            </div>
+                            
+                            <div style="display: flex; flex-direction: column;">
+                                <label style="font-weight: 600; margin-bottom: 8px; color: #8B4513; font-size: 1rem;">GPS Coordinates (Decimal Degrees):</label>
+                                <div style="font-size: 0.85rem; color: #6c757d; font-style: italic; margin-bottom: 5px;">Example: -25.123456, 27.654321</div>
+                                <input type="text" id="${sampleId}_gps" placeholder="-25.123456, 27.654321" style="padding: 12px 15px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; transition: all 0.3s ease; background: #f8f9fa;">
+                            </div>
+                        </div>
+
+                        <div style="background: #f8f9fa; border: 2px dashed #D2691E; border-radius: 10px; padding: 20px; margin-bottom: 25px;">
+                            <h4 style="color: #495057; margin-bottom: 15px; font-size: 1.2rem;">Select Parameter Categories and Parameters</h4>
+                            ${generateSedimentCategoriesHTML(sampleId)}
+                            
+                            <div id="${sampleId}_dataEntry" class="data-entry hidden" style="background: white; border: 1px solid #dee2e6; border-radius: 10px; padding: 20px; margin-top: 20px;">
+                                <h5 style="color: #8B4513; margin-bottom: 15px; font-size: 1.1rem;">Enter Measured Values (mg/kg)</h5>
+                                <div id="${sampleId}_dataGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">
+                                    <!-- Data entry fields will appear here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', sampleHTML);
+
+            // Initialize sample tracking
+            sedimentSamples.push({
+                id: sampleId,
+                number: newSampleNumber,
+                parameters: []
+            });
+        }
+
+        function generateSedimentCategoriesHTML(sampleId) {
+            let html = '';
+            
+            Object.keys(sedimentParameterCategories).forEach(categoryKey => {
+                const category = sedimentParameterCategories[categoryKey];
+                html += `
+                    <div style="background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span style="font-weight: 600; color: #8B4513; font-size: 1.1rem;">${category.name}</span>
+                            <button onclick="toggleSedimentCategory('${sampleId}', '${categoryKey}')" style="background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.8rem;">
+                                Show Parameters
+                            </button>
+                        </div>
+                        <div id="${sampleId}_${categoryKey}_content" style="display: none;">
+                            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+                                <select id="${sampleId}_${categoryKey}_select" style="flex: 1; min-width: 250px; padding: 12px 15px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; transition: all 0.3s ease; background: #f8f9fa;">
+                                    <option value="">-- Choose a parameter to add --</option>
+                                    ${Object.keys(category.parameters).map(paramKey => 
+                                        `<option value="${paramKey}">${category.parameters[paramKey].name}</option>`
+                                    ).join('')}
+                                </select>
+                                <button onclick="addSedimentParameter('${sampleId}', '${categoryKey}')" style="background: linear-gradient(135deg, #FF8C00, #FF7F50); color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all 0.3s ease; white-space: nowrap;">
+                                    ➕ Add Parameter
+                                </button>
+                            </div>
+                            <div id="${sampleId}_${categoryKey}_list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
+                                <!-- Selected parameters will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            return html;
+        }
+
+        function toggleSedimentCategory(sampleId, categoryKey) {
+            const content = document.getElementById(`${sampleId}_${categoryKey}_content`);
+            const button = content.previousElementSibling.querySelector('button');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                button.textContent = 'Hide Parameters';
+            } else {
+                content.style.display = 'none';
+                button.textContent = 'Show Parameters';
+            }
+        }
+
+        function addSedimentParameter(sampleId, categoryKey) {
+            const select = document.getElementById(`${sampleId}_${categoryKey}_select`);
+            const parameterKey = select.value;
+
+            if (!parameterKey) {
+                alert('Please select a parameter to add');
+                return;
+            }
+
+            const sample = sedimentSamples.find(s => s.id === sampleId);
+            if (sample && sample.parameters.some(p => p.key === parameterKey)) {
+                alert('This parameter has already been added to this sample');
+                return;
+            }
+
+            // Add to sample tracking
+            if (sample) {
+                sample.parameters.push({
+                    key: parameterKey,
+                    category: categoryKey
+                });
+            }
+
+            // Add parameter tag
+            const category = sedimentParameterCategories[categoryKey];
+            const parameterDef = category.parameters[parameterKey];
+            const parameterList = document.getElementById(`${sampleId}_${categoryKey}_list`);
+            
+            const parameterTag = document.createElement('div');
+            parameterTag.style.cssText = 'background: #8B4513; color: white; padding: 6px 10px; border-radius: 5px; font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 6px;';
+            parameterTag.setAttribute('data-parameter', parameterKey);
+            parameterTag.innerHTML = `
+                ${parameterDef.name}
+                <span style="background: #FF8C00; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; font-weight: 500; margin-left: 8px;">${category.name.split(' ')[0]}</span>
+                <button onclick="removeSedimentParameter('${sampleId}', '${categoryKey}', '${parameterKey}')" style="background: rgba(255, 255, 255, 0.3); border: none; color: white; cursor: pointer; font-size: 1rem; font-weight: bold; padding: 0; width: 14px; height: 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">×</button>
+            `;
+            
+            parameterList.appendChild(parameterTag);
+
+            // Add data entry field
+            const dataGrid = document.getElementById(`${sampleId}_dataGrid`);
+            const dataEntry = document.getElementById(`${sampleId}_dataEntry`);
+            
+            const fieldHTML = `
+                <div data-parameter="${parameterKey}" style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #D2691E;">
+                    <div style="display: flex; flex-direction: column;">
+                        <label style="font-weight: 600; margin-bottom: 8px; color: #8B4513; font-size: 1rem;">
+                            ${parameterDef.name} (${parameterDef.unit}):
+                        </label>
+                        <input type="number" 
+                               id="${sampleId}_${parameterKey}" 
+                               step="${parameterDef.step}" 
+                               placeholder="${parameterDef.placeholder}"
+                               style="padding: 12px 15px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; transition: all 0.3s ease; background: white;">
+                    </div>
+                </div>
+            `;
+            
+            dataGrid.insertAdjacentHTML('beforeend', fieldHTML);
+
+            // Show data entry section
+            dataEntry.classList.remove('hidden');
+
+            // Hide from dropdown and reset
+            const option = select.querySelector(`option[value="${parameterKey}"]`);
+            option.style.display = 'none';
+            select.value = '';
+        }
+
+        function removeSedimentParameter(sampleId, categoryKey, parameterKey) {
+            // Remove from sample tracking
+            const sample = sedimentSamples.find(s => s.id === sampleId);
+            if (sample) {
+                sample.parameters = sample.parameters.filter(p => p.key !== parameterKey);
+            }
+
+            // Remove parameter tag
+            const parameterTag = document.querySelector(`[data-sample-id="${sampleId}"] [data-parameter="${parameterKey}"]`);
+            if (parameterTag && parameterTag.style.background === 'rgb(139, 69, 19)') {
+                parameterTag.remove();
+            }
+
+            // Remove data entry field
+            const dataField = document.querySelector(`[data-sample-id="${sampleId}"] div[data-parameter="${parameterKey}"]`);
+            if (dataField && dataField.style.background === 'rgb(248, 249, 250)') {
+                dataField.remove();
+            }
+
+            // Hide data entry section if no parameters left
+            if (sample && sample.parameters.length === 0) {
+                const dataEntry = document.getElementById(`${sampleId}_dataEntry`);
+                dataEntry.classList.add('hidden');
+            }
+
+            // Show in dropdown again
+            const select = document.getElementById(`${sampleId}_${categoryKey}_select`);
+            const option = select.querySelector(`option[value="${parameterKey}"]`);
+            if (option) {
+                option.style.display = 'block';
+            }
+        }
+
+        function removeSedimentSample(sampleId) {
+            const sampleElement = document.querySelector(`[data-sample-id="${sampleId}"]`);
+            if (sampleElement) {
+                sampleElement.remove();
+            }
+
+            // Remove from tracking
+            sedimentSamples = sedimentSamples.filter(sample => sample.id !== sampleId);
+
+            // Show empty state if no samples left
+            const container = document.getElementById('sedimentSamplesContainer');
+            if (sedimentSamples.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" style="text-align: center; padding: 60px 20px; color: #8B4513; font-size: 1.1rem; background: #F5DEB3; border: 2px dashed #D2691E; border-radius: 15px; margin: 30px 0;">
+                        <p style="margin-bottom: 20px;">🌾 No sediment samples added yet</p>
+                        <p>Click "Add Sediment Sample" to get started with your soil quality assessment</p>
+                    </div>
+                `;
+            }
+        }
+
+        // ============================================
+        // SEDIMENT TOOL - DOWNLOAD/UPLOAD FUNCTIONALITY
+        // ============================================
+        
+        function findParameterCategory(parameterKey) {
+            // Find which category a parameter belongs to
+            for (const [categoryKey, category] of Object.entries(sedimentParameterCategories)) {
+                if (category.parameters[parameterKey]) {
+                    return categoryKey;
+                }
+            }
+            return null;
+        }
+        
+        function collectCurrentSedimentSampleData() {
+            // Collect data from all visible sediment sample forms
+            const updatedSamples = [];
+            
+            sedimentSamples.forEach(sample => {
+                const sampleId = sample.id;
+                const sampleData = {
+                    id: sampleId,
+                    number: sample.number,
+                    sampleInfo: {},
+                    parameters: []
+                };
+                
+                // Collect basic sample info
+                const idField = document.getElementById(`${sampleId}_id`);
+                const sourceField = document.getElementById(`${sampleId}_source`);
+                const gpsField = document.getElementById(`${sampleId}_gps`);
+                
+                if (idField) sampleData.sampleInfo.id = idField.value || '';
+                if (sourceField) sampleData.sampleInfo.source = sourceField.value || '';
+                if (gpsField) sampleData.sampleInfo.gps = gpsField.value || '';
+                
+                // Collect all parameters from the form (metals and contaminants)
+                const parameterFields = document.querySelectorAll(`[id^="${sampleId}_"]:not([id$="_id"]):not([id$="_source"]):not([id$="_gps"])`);
+                parameterFields.forEach(field => {
+                    if (field.value && field.value.trim() !== '') {
+                        const paramName = field.id.replace(`${sampleId}_`, '');
+                        sampleData.parameters.push({
+                            name: paramName,
+                            value: field.value
+                        });
+                    }
+                });
+                
+                updatedSamples.push(sampleData);
+            });
+            
+            return updatedSamples;
+        }
+        
+        function downloadSedimentData() {
+            if (sedimentSamples.length === 0) {
+                alert('⚠️ No sediment samples to download. Please add at least one sample first.');
+                return;
+            }
+            
+            // Collect current data from forms
+            const currentSamples = collectCurrentSedimentSampleData();
+            
+            const exportData = {
+                tool: "Sediment Quality Assessment",
+                version: "2.0",
+                user: currentUser,
+                exportDate: new Date().toISOString(),
+                exportDateReadable: new Date().toLocaleString(),
+                sampleCount: currentSamples.length,
+                samples: currentSamples,
+                sampleCounter: sedimentSampleCounter
+            };
+            
+            // Create and download file
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `sediment-samples-${currentUser}-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            alert(`✅ Downloaded ${currentSamples.length} sediment sample(s) successfully!\n\nFile: sediment-samples-${currentUser}-${new Date().toISOString().split('T')[0]}.json`);
+        }
+        
+        function uploadSedimentData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        
+                        // Validate it's sediment tool data
+                        if (!data.tool || !data.tool.includes('Sediment')) {
+                            alert('⚠️ Invalid file! This does not appear to be a sediment quality data file.');
+                            return;
+                        }
+                        
+                        if (!data.samples || data.samples.length === 0) {
+                            alert('⚠️ No sample data found in this file.');
+                            return;
+                        }
+                        
+                        // Confirm before overwriting
+                        if (sedimentSamples.length > 0) {
+                            if (!confirm(`⚠️ You currently have ${sedimentSamples.length} sample(s).\n\nUploading this file will REPLACE your current samples with ${data.sampleCount} sample(s) from ${data.exportDateReadable || data.exportDate}.\n\nContinue?`)) {
+                                return;
+                            }
+                        }
+                        
+                        // Clear current samples
+                        sedimentSamples = [];
+                        sedimentSampleCounter = data.sampleCounter || 0;
+                        
+                        // Restore samples from file
+                        data.samples.forEach((sampleData, index) => {
+                            sedimentSampleCounter++;
+                            const sampleId = `sediment_sample_${sedimentSampleCounter}`;
+                            
+                            // Reconstruct parameters array with key and category
+                            const parametersArray = [];
+                            if (sampleData.parameters && sampleData.parameters.length > 0) {
+                                sampleData.parameters.forEach(param => {
+                                    const category = findParameterCategory(param.name);
+                                    if (category) {
+                                        parametersArray.push({
+                                            key: param.name,
+                                            category: category
+                                        });
+                                    }
+                                });
+                            }
+                            
+                            // Create sample object for tracking WITH parameters array
+                            sedimentSamples.push({
+                                id: sampleId,
+                                number: sampleData.number || (index + 1),
+                                parameters: parametersArray
+                            });
+                            
+                            // Add sample to UI
+                            const container = document.getElementById('sedimentSamplesContainer');
+                            const emptyState = container.querySelector('.empty-state');
+                            if (emptyState) emptyState.remove();
+                            
+                            // Create sample HTML
+                            const sampleHTML = createUploadedSedimentSample(sampleId, sampleData);
+                            container.insertAdjacentHTML('beforeend', sampleHTML);
+                        });
+                        
+                        alert(`✅ Successfully uploaded ${data.sampleCount} sediment sample(s)!\n\nFrom: ${data.exportDateReadable || data.exportDate}\nUser: ${data.user}`);
+                        
+                    } catch (err) {
+                        alert('⚠️ Failed to load file. Please ensure it is a valid JSON file from this tool.');
+                        console.error('Upload error:', err);
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+        
+        function createUploadedSedimentSample(sampleId, sampleData) {
+            const number = sampleData.number;
+            const info = sampleData.sampleInfo || {};
+            
+            let parametersHTML = '';
+            if (sampleData.parameters && sampleData.parameters.length > 0) {
+                sampleData.parameters.forEach(param => {
+                    const paramLabel = formatSedimentParameterName(param.name);
+                    parametersHTML += `
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #8B4513;">${paramLabel}</label>
+                            <input type="number" step="any" id="${sampleId}_${param.name}" value="${param.value}" style="width: 100%; padding: 10px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem;">
+                        </div>
+                    `;
+                });
+            }
+            
+            return `
+                <div class="sediment-sample" data-sample-id="${sampleId}" style="background: white; border: 2px solid #D2691E; border-radius: 15px; margin-bottom: 30px; overflow: hidden; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);">
+                    <div class="sample-header" style="background: linear-gradient(135deg, #F5DEB3, #DEB887); padding: 20px 25px; border-bottom: 2px solid #D2691E; display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="font-size: 1.4rem; font-weight: 600; color: #8B4513; margin: 0;">Sediment Sample ${number}</h3>
+                        <button onclick="removeSedimentSample('${sampleId}')" style="background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500;">
+                            🗑️ Remove Sample
+                        </button>
+                    </div>
+                    <div class="sample-content" style="padding: 25px;">
+                        <div style="background: #F5F5DC; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 2px solid #D2691E;">
+                            <h4 style="color: #8B4513; margin-bottom: 15px;">📋 Sample Information</h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #8B4513;">Sample ID</label>
+                                    <input type="text" id="${sampleId}_id" value="${info.id || ''}" style="width: 100%; padding: 10px; border: 2px solid #e0e6ed; border-radius: 8px;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #8B4513;">Source/Location</label>
+                                    <input type="text" id="${sampleId}_source" value="${info.source || ''}" style="width: 100%; padding: 10px; border: 2px solid #e0e6ed; border-radius: 8px;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #8B4513;">GPS Coordinates</label>
+                                    <input type="text" id="${sampleId}_gps" value="${info.gps || ''}" style="width: 100%; padding: 10px; border: 2px solid #e0e6ed; border-radius: 8px;">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="background: linear-gradient(135deg, #FFF8DC, #F5DEB3); padding: 20px; border-radius: 10px; border: 2px solid #D2691E;">
+                            <h4 style="color: #8B4513; margin-bottom: 20px;">🧪 Sediment Quality Parameters</h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                                ${parametersHTML || '<p style="color: #666;">No parameters found in uploaded data</p>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function formatSedimentParameterName(paramKey) {
+            // Convert parameter key to readable label
+            const paramLabels = {
+                'arsenic': 'Arsenic (As) - mg/kg',
+                'cadmium': 'Cadmium (Cd) - mg/kg',
+                'chromium': 'Chromium (Cr) - mg/kg',
+                'copper': 'Copper (Cu) - mg/kg',
+                'lead': 'Lead (Pb) - mg/kg',
+                'mercury': 'Mercury (Hg) - mg/kg',
+                'nickel': 'Nickel (Ni) - mg/kg',
+                'zinc': 'Zinc (Zn) - mg/kg',
+                'antimony': 'Antimony (Sb) - mg/kg',
+                'beryllium': 'Beryllium (Be) - mg/kg',
+                'boron': 'Boron (B) - mg/kg',
+                'cobalt': 'Cobalt (Co) - mg/kg',
+                'molybdenum': 'Molybdenum (Mo) - mg/kg',
+                'selenium': 'Selenium (Se) - mg/kg',
+                'silver': 'Silver (Ag) - mg/kg',
+                'thallium': 'Thallium (Tl) - mg/kg',
+                'vanadium': 'Vanadium (V) - mg/kg',
+                'benzo_a_pyrene': 'Benzo(a)pyrene - mg/kg',
+                'phenol': 'Phenol - mg/kg',
+                'cresol': 'Cresol - mg/kg',
+                'benzene': 'Benzene - mg/kg',
+                'toluene': 'Toluene - mg/kg',
+                'ethylbenzene': 'Ethylbenzene - mg/kg',
+                'xylene': 'Xylene - mg/kg'
+            };
+            
+            return paramLabels[paramKey] || paramKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function performSedimentAnalysis() {
+            if (sedimentSamples.length === 0) {
+                alert('Please add at least one sediment sample before running analysis');
+                return;
+            }
+
+            const results = analyzeSedimentCompliance();
+            displaySedimentResults(results);
+            generateSedimentComplianceStatement(results);
+
+            document.getElementById('sedimentResults').classList.remove('hidden');
+            document.getElementById('sedimentResults').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function analyzeSedimentCompliance() {
+            const allResults = [];
+
+            sedimentSamples.forEach(sample => {
+                const sampleResults = {
+                    sampleId: sample.id,
+                    sampleNumber: sample.number,
+                    sampleInfo: {
+                        id: document.getElementById(`${sample.id}_id`).value || `Sample ${sample.number}`,
+                        source: document.getElementById(`${sample.id}_source`).value || 'Not specified',
+                        gps: document.getElementById(`${sample.id}_gps`).value || 'Not provided'
+                    },
+                    results: []
+                };
+
+                sample.parameters.forEach(param => {
+                    const inputElement = document.getElementById(`${sample.id}_${param.key}`);
+                    const value = parseFloat(inputElement.value);
+
+                    if (!isNaN(value) && sedimentStandards[param.key]) {
+                        const standard = sedimentStandards[param.key];
+                        const category = sedimentParameterCategories[param.category];
+                        const parameterDef = category.parameters[param.key];
+
+                        let result = {
+                            parameter: parameterDef.name,
+                            value: value,
+                            unit: parameterDef.unit,
+                            parameterKey: param.key,
+                            category: category.name,
+                            ssv1: standard.ssv1,
+                            informal: standard.informal,
+                            standard_res: standard.standard,
+                            commercial: standard.commercial,
+                            ecosystem: standard.ecosystem
+                        };
+
+                        // Determine highest exceeded threshold
+                        result.exceedsSSV1 = value > standard.ssv1;
+                        result.exceedsEcosystem = standard.ecosystem ? value > standard.ecosystem : false;
+                        result.exceedsCommercial = standard.commercial ? value > standard.commercial : false;
+                        result.exceedsStandard = standard.standard ? value > standard.standard : false;
+                        result.exceedsInformal = standard.informal ? value > standard.informal : false;
+
+                        // Determine compliance status and highest exceeded level
+                        if (result.exceedsCommercial) {
+                            result.highestExceeded = 'Commercial/Industrial';
+                            result.exceedanceFactor = value / standard.commercial;
+                            result.exceedanceThreshold = standard.commercial;
+                        } else if (result.exceedsStandard) {
+                            result.highestExceeded = 'Standard Residential';
+                            result.exceedanceFactor = value / standard.standard;
+                            result.exceedanceThreshold = standard.standard;
+                        } else if (result.exceedsInformal) {
+                            result.highestExceeded = 'Informal Residential';
+                            result.exceedanceFactor = value / standard.informal;
+                            result.exceedanceThreshold = standard.informal;
+                        } else if (result.exceedsEcosystem) {
+                            result.highestExceeded = 'Ecosystem Protection';
+                            result.exceedanceFactor = value / standard.ecosystem;
+                            result.exceedanceThreshold = standard.ecosystem;
+                        } else if (result.exceedsSSV1) {
+                            result.highestExceeded = 'SSV1 (Water Resource Protection)';
+                            result.exceedanceFactor = value / standard.ssv1;
+                            result.exceedanceThreshold = standard.ssv1;
+                        } else {
+                            result.highestExceeded = null;
+                            result.exceedanceFactor = value / standard.ssv1;
+                            result.exceedanceThreshold = standard.ssv1;
+                        }
+
+                        sampleResults.results.push(result);
+                    }
+                });
+
+                if (sampleResults.results.length > 0) {
+                    allResults.push(sampleResults);
+                }
+            });
+
+            return allResults;
+        }
+
+        function displaySedimentResults(sedimentResults) {
+            const container = document.getElementById('sedimentResultsContainer');
+
+            if (sedimentResults.length === 0) {
+                container.innerHTML = '<p>No sediment analysis data available for compliance checking.</p>';
+                return;
+            }
+
+            let html = '';
+            
+            // Add explanatory note at the top
+            html += `
+                <div style="background: linear-gradient(135deg, #fef5e7, #fdebd0); border: 2px solid #f39c12; border-radius: 10px; padding: 20px; margin-bottom: 25px;">
+                    <h4 style="color: #8B4513; margin: 0 0 10px 0;">📖 Understanding Soil Screening Values (SSV)</h4>
+                    <div style="line-height: 1.6;">
+                        <strong>SSV1:</strong> Baseline threshold for all land-uses, protective of water resource (most protective)<br>
+                        <strong>SSV2:</strong> Land-use specific thresholds (Informal Residential, Standard Residential, Commercial/Industrial, Protection of Ecosystem Health)<br>
+                        <em style="font-size: 0.9rem; color: #666;">Note: SSV2 thresholds are only shown when exceeded</em>
+                    </div>
+                </div>
+            `;
+
+            sedimentResults.forEach(sample => {
+                html += `<div style="margin-bottom: 30px;">`;
+                html += `<h4 style="color: #8B4513; margin-bottom: 15px; padding: 12px 18px; background: linear-gradient(135deg, #F5DEB3, #DEB887); border-radius: 8px; border-left: 4px solid #8B4513; font-size: 1.2rem;">🏔️ ${sample.sampleInfo.id} - ${sample.sampleInfo.source}</h4>`;
+                
+                if (sample.sampleInfo.gps !== 'Not provided') {
+                    html += `<p><strong>📍 GPS:</strong> ${sample.sampleInfo.gps}</p>`;
+                }
+
+                html += '<table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);">';
+                html += `
+                    <thead>
+                        <tr>
+                            <th style="background: linear-gradient(135deg, #8B4513, #A0522D); color: white; padding: 12px; text-align: left; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.8rem;">Parameter</th>
+                            <th style="background: linear-gradient(135deg, #8B4513, #A0522D); color: white; padding: 12px; text-align: left; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.8rem;">Category</th>
+                            <th style="background: linear-gradient(135deg, #8B4513, #A0522D); color: white; padding: 12px; text-align: center; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.8rem;">Measured<br>(mg/kg)</th>
+                            <th style="background: linear-gradient(135deg, #8B4513, #A0522D); color: white; padding: 12px; text-align: center; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.8rem;">SSV1<br>(mg/kg)</th>
+                            <th style="background: linear-gradient(135deg, #8B4513, #A0522D); color: white; padding: 12px; text-align: left; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.8rem;">Violated SSV2 Thresholds</th>
+                            <th style="background: linear-gradient(135deg, #8B4513, #A0522D); color: white; padding: 12px; text-align: left; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.8rem;">Compliance Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                `;
+
+                sample.results.forEach(result => {
+                    let statusDisplay = '';
+                    let statusClass = '';
+                    let violatedThresholds = '';
+
+                    // Build list of violated SSV2 thresholds
+                    let violations = [];
+                    if (result.exceedsEcosystem) {
+                        violations.push(`Ecosystem: ${result.ecosystem} mg/kg`);
+                    }
+                    if (result.exceedsCommercial) {
+                        violations.push(`Commercial: ${result.commercial} mg/kg`);
+                    }
+                    if (result.exceedsStandard) {
+                        violations.push(`Standard Res: ${result.standard_res} mg/kg`);
+                    }
+                    if (result.exceedsInformal) {
+                        violations.push(`Informal Res: ${result.informal} mg/kg`);
+                    }
+                    
+                    if (violations.length > 0) {
+                        violatedThresholds = violations.join('<br>');
+                    } else if (result.exceedsSSV1) {
+                        violatedThresholds = '<span style="color: #666; font-style: italic;">None (SSV1 only)</span>';
+                    } else {
+                        violatedThresholds = '<span style="color: #27ae60; font-weight: 600;">✓ None</span>';
+                    }
+
+                    // SSV1 status indicator
+                    let ssv1Display = result.ssv1;
+                    if (result.exceedsSSV1) {
+                        ssv1Display = `<span style="color: #e74c3c; font-weight: 600;">${result.ssv1} ❌</span>`;
+                    } else {
+                        ssv1Display = `<span style="color: #27ae60; font-weight: 600;">${result.ssv1} ✓</span>`;
+                    }
+
+                    if (result.highestExceeded) {
+                        statusClass = 'background: #f8d7da; color: #721c24; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem;';
+                        statusDisplay = `⚠️ Exceeds ${result.highestExceeded}<br><span style="font-size: 0.75rem;">(${result.exceedanceFactor.toFixed(1)}× threshold)</span>`;
+                    } else {
+                        statusClass = 'background: #d4edda; color: #155724; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem;';
+                        statusDisplay = '✅ Within All Limits';
+                    }
+
+                    html += `
+                        <tr style="border-bottom: 1px solid #e0e6ed;">
+                            <td style="padding: 12px;"><strong>${result.parameter}</strong></td>
+                            <td style="padding: 12px; color: #666;">${result.category}</td>
+                            <td style="padding: 12px; text-align: center; font-weight: 600; font-size: 1rem;">${result.value.toFixed(2)}</td>
+                            <td style="padding: 12px; text-align: center;">${ssv1Display}</td>
+                            <td style="padding: 12px; font-size: 0.85rem; line-height: 1.5;">${violatedThresholds}</td>
+                            <td style="padding: 12px;"><span style="${statusClass}">${statusDisplay}</span></td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                html += '</div><br>';
+            });
+
+            container.innerHTML = html;
+            
+            // Show results tab and navigate to it
+            const resultsTab = document.getElementById('marineResultsTab');
+            if (resultsTab) resultsTab.style.display = 'inline-block';
+            showMarineSection('results');
+        }
+
+        function generateSedimentComplianceStatement(results) {
+            const container = document.getElementById('sedimentComplianceStatement');
+            
+            let criticalViolations = [];
+            
+            // Check sediment violations across all samples
+            results.forEach(sample => {
+                sample.results.forEach(result => {
+                    if (result.highestExceeded) {
+                        const sampleLabel = `${sample.sampleInfo.id} (${sample.sampleInfo.source})`;
+                        criticalViolations.push(`${result.parameter} in ${sampleLabel} exceeds ${result.highestExceeded} threshold (${result.value.toFixed(2)} mg/kg vs ${result.exceedanceThreshold} mg/kg, ${result.exceedanceFactor.toFixed(1)}× threshold)`);
+                    }
+                });
+            });
+
+            let statement = '<h3>🔬 Expert Assessment Statement</h3>';
+            
+            if (criticalViolations.length > 0) {
+                statement += '<div style="background: #f8d7da; color: #721c24; padding: 15px; margin: 15px 0; border-radius: 10px; font-weight: 600;">';
+                statement += '<strong>⚠️ CRITICAL VIOLATIONS IDENTIFIED</strong><br>';
+                statement += 'The following parameters exceed South African Soil Screening Values:';
+                statement += '<ul style="margin: 10px 0; padding-left: 20px;">';
+                criticalViolations.forEach(violation => {
+                    statement += `<li>${violation}</li>`;
+                });
+                statement += '</ul>';
+                statement += '</div>';
+
+                statement += '<p><strong>Regulatory Implications:</strong> ';
+                statement += 'Exceedances of Soil Screening Values (SSV) indicate potential risks to human health and/or ecological receptors according to the National Norms and Standards for Remediation of Contaminated Land and Soil Quality (Government Gazette No. 36447, 2013). These exceedances may trigger requirements for site assessment and potential remediation under the National Environmental Management: Waste Act, 2008. ';
+                statement += '</p>';
+
+                statement += '<p><strong>Environmental Risk:</strong> The detected contamination levels may pose risks to human health through multiple exposure pathways and/or ecological receptors through direct contact, bioaccumulation, and potential migration to water resources. The specific risk level depends on the intended land use and proximity to sensitive receptors.</p>';
+
+                statement += '<p><strong>Recommendation:</strong> The contaminated areas warrant immediate attention and appropriate management measures. A detailed site assessment should be conducted to determine the extent of contamination and develop appropriate remediation strategies to protect both human health and environmental integrity.</p>';
+
+            } else {
+                statement += '<div style="background: #fff3cd; color: #856404; padding: 15px; margin: 15px 0; border-radius: 10px; font-weight: 600;">';
+                statement += '<strong>✅ NO CRITICAL VIOLATIONS DETECTED</strong><br>';
+                statement += 'All measured parameters are within South African Soil Screening Values for the tested constituents.';
+                statement += '</div>';
+                
+                statement += '<p><strong>Assessment:</strong> Based on the provided analytical results, the measured concentrations comply with relevant South African Soil Screening Values (SSV1) and ecosystem protection guidelines for the parameters analyzed across all sampled locations.</p>';
+                
+                statement += '<p><strong>Recommendation:</strong> Continue routine monitoring to ensure ongoing compliance with soil quality standards. Maintain current soil management practices to prevent future contamination.</p>';
+            }
+
+            statement += `<p style="margin-top: 20px; font-style: italic; font-size: 0.9rem;"><strong>Note:</strong> This automated assessment analyzed ${results.length} sediment sample(s) against South African Soil Screening Values (Government Gazette No. 36447, 2013). A comprehensive environmental assessment may require additional parameters and expert interpretation by qualified environmental professionals.</p>`;
+
+            container.innerHTML = statement;
+        }
+
+        // WATER TOOL FUNCTIONS
+        function loadWaterTool() {
+            const container = document.getElementById('waterToolContainer');
+            container.innerHTML = `
+                <div style="background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 20px; margin: -30px -30px 0px -30px; text-align: center;">
+                    <h1 style="font-size: 2rem; margin-bottom: 10px;">💧 Water Quality Compliance Tool</h1>
+                    <p>Multi-site water quality assessment and compliance checking</p>
+                </div>
+
+                <div class="water-nav-bar" style="margin: 0 -30px;">
+                    <button class="water-nav-btn active" onclick="showWaterSection('assessment')">🧪 Assessment</button>
+                    <button class="water-nav-btn" onclick="showWaterSection('monitoring')">📍 Single Site Monitoring</button>
+                    <button class="water-nav-btn" onclick="showWaterSection('river-continuum')">🗺️ River Continuum Monitoring</button>
+                </div>
+
+                <div id="waterContentArea" style="margin-top: 20px;">
+                    <!-- Assessment Section -->
+                    <div id="water-assessment" class="water-section active">
+                        <div class="samples-header">
+                            <h2 style="color: #2c3e50;">Water Samples</h2>
+                            <button class="btn-add-sample" style="background: linear-gradient(135deg, #27ae60, #2ecc71); box-shadow: 0 5px 15px rgba(46, 204, 113, 0.3);" onclick="addWaterSample()">
+                                ➕ Add Water Sample
+                            </button>
+                        </div>
+
+                        <div id="waterSamplesContainer">
+                            <div class="empty-state" style="text-align: center; padding: 60px 20px; color: #6c757d; font-size: 1.1rem; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 15px; margin: 30px 0;">
+                                <p style="margin-bottom: 20px;">🌊 No water samples added yet</p>
+                                <p>Click "Add Water Sample" to get started with your water quality assessment</p>
+                            </div>
+                        </div>
+
+                        <div style="background: linear-gradient(135deg, #e8f5e9, #c8e6c9); border: 2px solid #4caf50; border-radius: 15px; padding: 25px; margin: 30px 0;">
+                            <h4 style="color: #2c5530; margin: 0 0 15px 0; font-size: 1.1rem;">💾 Data Management</h4>
+                            <p style="color: #555; margin-bottom: 20px; font-size: 0.95rem;">Save your sample data as a file to continue later or transfer to another device</p>
+                            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                                <button class="btn-primary" onclick="downloadWaterData()" style="background: linear-gradient(135deg, #3498db, #2980b9); flex: 1; min-width: 200px; padding: 15px 25px; font-size: 1rem;">
+                                    📥 Download Data File
+                                </button>
+                                <button class="btn-primary" onclick="uploadWaterData()" style="background: linear-gradient(135deg, #9b59b6, #8e44ad); flex: 1; min-width: 200px; padding: 15px 25px; font-size: 1rem;">
+                                    📤 Upload Previous Data
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="text-align: center; margin: 40px 0; padding: 30px; background: linear-gradient(135deg, #f8f9fa, #e9ecef); border-radius: 15px;">
+                            <button style="background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; padding: 18px 40px; border: none; border-radius: 12px; cursor: pointer; font-size: 1.2rem; font-weight: 700; transition: all 0.3s ease; box-shadow: 0 8px 20px rgba(231, 76, 60, 0.3); text-transform: uppercase; letter-spacing: 1px;" onclick="performWaterAnalysis()" onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 15px 30px rgba(231, 76, 60, 0.4)'" onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 8px 20px rgba(231, 76, 60, 0.3)'">
+                                🔬 Analyze Water Quality Compliance
+                            </button>
+                        </div>
+
+                        <div id="waterResults" class="results hidden" style="margin-top: 40px;">
+                            <div class="sample-results">
+                                <h3>📊 Compliance Analysis Results</h3>
+                                <div id="waterResultsContainer"></div>
+                                <div id="waterComplianceStatement" class="statement-box"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Single Site Monitoring Tool Section -->
+                    <div id="water-monitoring" class="water-section">
+                        <div class="card">
+                            <h3>📍 Single Site Monitoring Tool</h3>
+                            <p style="line-height: 1.6; margin-bottom: 20px;">
+                                Track water quality parameters over time at a single monitoring location. Visualize trends and compare measurements against South African water quality guidelines (TWQR, CEV, AEV).
+                            </p>
+
+                            <div class="info-box">
+                                <strong>📌 How to use:</strong><br>
+                                1. Select a water quality parameter to monitor<br>
+                                2. Enter the number of sampling events<br>
+                                3. Input date and concentration for each sample<br>
+                                4. Generate the monitoring graph with threshold lines<br>
+                                5. Download the graph with automated interpretation
+                            </div>
+
+                            <div style="margin-top: 30px;">
+                                <h4>⚙️ Configure Monitoring</h4>
+                                
+                                <div class="input-group" style="margin-top: 20px;">
+                                    <div class="input-field">
+                                        <label for="monitoringParameter"><strong>Select Parameter:</strong></label>
+                                        <select id="monitoringParameter" onchange="updateMonitoringParameterInfo()" style="padding: 12px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; width: 100%;">
+                                            <option value="">-- Choose a parameter --</option>
+                                            <option value="aluminum">Aluminum (Al) - mg/L</option>
+                                            <option value="arsenic">Arsenic (As) - mg/L</option>
+                                            <option value="cadmium">Cadmium (Cd) - mg/L</option>
+                                            <option value="chromium_total">Chromium Total (Cr) - mg/L</option>
+                                            <option value="cobalt">Cobalt (Co) - mg/L</option>
+                                            <option value="copper">Copper (Cu) - mg/L</option>
+                                            <option value="iron">Iron (Fe) - mg/L</option>
+                                            <option value="lead">Lead (Pb) - mg/L</option>
+                                            <option value="manganese">Manganese (Mn) - mg/L</option>
+                                            <option value="mercury">Mercury (Hg) - mg/L</option>
+                                            <option value="nickel">Nickel (Ni) - mg/L</option>
+                                            <option value="vanadium">Vanadium (V) - mg/L</option>
+                                            <option value="zinc">Zinc (Zn) - mg/L</option>
+                                            <option value="sulfate">Sulfate (SO₄) - mg/L</option>
+                                            <option value="ammonium">Ammonium (NH₄⁺) - mg N/L</option>
+                                            <option value="nitrate">Nitrate (NO₃⁻) - mg N/L</option>
+                                            <option value="nitrite">Nitrite (NO₂⁻) - mg N/L</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="input-field">
+                                        <label for="numSamplingEvents"><strong>Number of Sampling Events:</strong></label>
+                                        <input type="number" id="numSamplingEvents" min="2" max="20" placeholder="e.g., 3" style="padding: 12px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; width: 100%;">
+                                    </div>
+                                </div>
+
+                                <div id="monitoringParameterInfo" style="margin-top: 15px; padding: 15px; background: #f0f8ff; border-left: 4px solid #3498db; border-radius: 5px; display: none;">
+                                    <strong>Guideline Thresholds:</strong><br>
+                                    <span id="parameterThresholds"></span>
+                                </div>
+
+                                <div style="text-align: center; margin: 25px 0;">
+                                    <button class="btn-primary" onclick="generateSampleInputs()" style="padding: 15px 30px; font-size: 1.1rem;">
+                                        📝 Generate Sample Input Form
+                                    </button>
+                                </div>
+
+                                <div id="sampleInputsContainer" style="margin-top: 30px;"></div>
+
+                                <div id="monitoringGraphContainer" style="margin-top: 40px; display: none;">
+                                    <h4>📈 Monitoring Graph</h4>
+                                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                                        <canvas id="monitoringChart" style="max-height: 500px;"></canvas>
+                                    </div>
+                                    
+                                    <div id="monitoringInterpretation" style="margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #3498db;">
+                                    </div>
+
+                                    <div style="text-align: center; margin-top: 25px; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                                        <button class="btn-secondary" onclick="downloadMonitoringGraph('png')" style="padding: 12px 25px;">
+                                            📥 Download as PNG
+                                        </button>
+                                        <button class="btn-secondary" onclick="downloadMonitoringGraph('pdf')" style="padding: 12px 25px;">
+                                            📥 Download as PDF
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- River Continuum Monitoring Tool Section -->
+                    <div id="water-river-continuum" class="water-section">
+                        <div class="card">
+                            <h3>🗺️ River Continuum Monitoring Tool</h3>
+                            <p style="line-height: 1.6; margin-bottom: 20px;">
+                                Track water quality parameters across multiple sites along a river system over time. Visualize spatio-temporal trends and compare measurements against South African water quality guidelines (TWQR, CEV, AEV).
+                            </p>
+
+                            <div class="info-box">
+                                <strong>📌 How to use:</strong><br>
+                                1. Select a water quality parameter to monitor<br>
+                                2. Enter the number of monitoring sites along the river<br>
+                                3. For each site, specify distance from source (km) and add samples with dates<br>
+                                4. Select a trend line visualization method<br>
+                                5. Generate the river continuum graph with threshold lines<br>
+                                6. Download the graph with automated interpretation
+                                
+                                <div style="margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 5px;">
+                                    <strong>💡 Data Requirements for Trend Lines:</strong>
+                                    <p style="margin: 8px 0 5px 0; font-size: 0.85rem; color: #856404;">
+                                        <em>Total data points = number of sites × samples per site (replicates)</em>
+                                    </p>
+                                    <table style="width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 0.85rem;">
+                                        <thead>
+                                            <tr style="background: #f8f9fa;">
+                                                <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">Trend Line Type</th>
+                                                <th style="padding: 8px; text-align: center; border-bottom: 2px solid #dee2e6;">Minimum Total Points</th>
+                                                <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">Example Combinations (Sites × Replicates)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">LOWESS Smoothing</td>
+                                                <td style="padding: 8px; text-align: center; border-bottom: 1px solid #dee2e6;">10+</td>
+                                                <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">5 sites × 2 samples, 3 sites × 4 samples, 10 sites × 1 sample</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">3-Point Moving Average</td>
+                                                <td style="padding: 8px; text-align: center; border-bottom: 1px solid #dee2e6;">3+</td>
+                                                <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">3 sites × 1 sample, 2 sites × 2 samples</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">Linear Regression</td>
+                                                <td style="padding: 8px; text-align: center; border-bottom: 1px solid #dee2e6;">2+ (5+ better)</td>
+                                                <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">2 sites × 1 sample (minimum), 3 sites × 2 samples (better)</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px;">Polynomial Fit (2nd degree)</td>
+                                                <td style="padding: 8px; text-align: center;">3+</td>
+                                                <td style="padding: 8px;">3 sites × 1 sample, 2 sites × 2 samples</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <p style="margin: 10px 0 0 0; font-size: 0.85rem; color: #856404;">
+                                        <strong>💡 Tip:</strong> More data points = smoother, more reliable trend lines. Aim for 15-20 total points for best results.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 30px;">
+                                <h4>⚙️ Configure River Monitoring</h4>
+                                
+                                <div class="input-group" style="margin-top: 20px;">
+                                    <div class="input-field">
+                                        <label for="riverMonitoringParameter"><strong>Select Parameter:</strong></label>
+                                        <select id="riverMonitoringParameter" onchange="updateRiverMonitoringParameterInfo()" style="padding: 12px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; width: 100%;">
+                                            <option value="">-- Choose a parameter --</option>
+                                            <option value="aluminum">Aluminum (Al) - mg/L</option>
+                                            <option value="arsenic">Arsenic (As) - mg/L</option>
+                                            <option value="cadmium">Cadmium (Cd) - mg/L</option>
+                                            <option value="chromium_total">Chromium Total (Cr) - mg/L</option>
+                                            <option value="cobalt">Cobalt (Co) - mg/L</option>
+                                            <option value="copper">Copper (Cu) - mg/L</option>
+                                            <option value="iron">Iron (Fe) - mg/L</option>
+                                            <option value="lead">Lead (Pb) - mg/L</option>
+                                            <option value="manganese">Manganese (Mn) - mg/L</option>
+                                            <option value="mercury">Mercury (Hg) - mg/L</option>
+                                            <option value="nickel">Nickel (Ni) - mg/L</option>
+                                            <option value="vanadium">Vanadium (V) - mg/L</option>
+                                            <option value="zinc">Zinc (Zn) - mg/L</option>
+                                            <option value="sulfate">Sulfate (SO₄) - mg/L</option>
+                                            <option value="ammonium">Ammonium (NH₄⁺) - mg N/L</option>
+                                            <option value="ammonia_unionized">Ammonia Unionized (NH₃) - mg N/L</option>
+                                            <option value="nitrate">Nitrate (NO₃⁻) - mg N/L</option>
+                                            <option value="nitrite">Nitrite (NO₂⁻) - mg N/L</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="input-field">
+                                        <label for="numRiverSites"><strong>Number of Monitoring Sites:</strong></label>
+                                        <input type="number" id="numRiverSites" min="2" max="15" placeholder="e.g., 5" style="padding: 12px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1rem; width: 100%;">
+                                    </div>
+                                </div>
+
+                                <div id="riverMonitoringParameterInfo" style="margin-top: 15px; padding: 15px; background: #f0f8ff; border-left: 4px solid #3498db; border-radius: 5px; display: none;">
+                                    <strong>Guideline Thresholds:</strong><br>
+                                    <span id="riverParameterThresholds"></span>
+                                </div>
+
+                                <!-- River Network Import Section -->
 
                                 <div style="text-align: center; margin: 25px 0;">
                                     <button class="btn-primary" onclick="generateRiverSiteInputs()" style="padding: 15px 30px; font-size: 1.1rem;">
@@ -5247,61 +6300,78 @@ Site E - Downstream,-25.763000,28.203000</pre>
             
             // Check exceedances
             let twqrExceed = 0, cevExceed = 0, aevExceed = 0;
-            
             riverMonitoringData.forEach(point => {
                 if (standards.twqr !== undefined && standards.twqr !== null && point.value > parseFloat(standards.twqr)) twqrExceed++;
                 if (standards.cev !== undefined && standards.cev !== null && point.value > parseFloat(standards.cev)) cevExceed++;
                 if (standards.aev !== undefined && standards.aev !== null && point.value > parseFloat(standards.aev)) aevExceed++;
             });
             
-            // Identify spatial gradient
+            // Spatial gradient
             const firstSiteAvg = riverMonitoringData.filter(d => d.site === 1).reduce((sum, d) => sum + d.value, 0) / riverMonitoringData.filter(d => d.site === 1).length;
             const lastSite = Math.max(...riverMonitoringData.map(d => d.site));
             const lastSiteAvg = riverMonitoringData.filter(d => d.site === lastSite).reduce((sum, d) => sum + d.value, 0) / riverMonitoringData.filter(d => d.site === lastSite).length;
             const gradient = ((lastSiteAvg - firstSiteAvg) / firstSiteAvg * 100).toFixed(1);
             const gradientDirection = gradient > 0 ? 'increase' : 'decrease';
-            
-            let interpretation = `<h4 style="margin-bottom: 15px; color: #2c3e50;">📊 River Continuum Analysis</h4>`;
-            interpretation += `<p style="line-height: 1.8; color: #34495e;">`;
-            interpretation += `<strong>Dataset Overview:</strong> Analysis of ${totalPoints} measurements across ${sites} monitoring sites along the river continuum, spanning ${years.length > 1 ? years[0] + '-' + years[years.length-1] : years[0]}. `;
-            interpretation += `The ${getTrendLineLabel(trendLineType).toLowerCase()} shows the overall spatial trend of ${paramDef.name} concentrations along the river system.<br><br>`;
-            
-            interpretation += `<strong>Spatial Gradient:</strong> From upstream to downstream, ${paramDef.name} concentrations show a ${Math.abs(gradient)}% ${gradientDirection} `;
-            interpretation += `(from ${firstSiteAvg.toFixed(3)} to ${lastSiteAvg.toFixed(3)} ${paramDef.unit}). `;
-            
+            const yearRange = years.length > 1 ? years[0] + '-' + years[years.length-1] : years[0];
+
+            // Gradient sentence (shared between both versions)
+            let gradientSentence = '';
             if (Math.abs(parseFloat(gradient)) > 50) {
-                interpretation += `This substantial gradient suggests significant pollution inputs or natural attenuation processes along the river continuum.<br><br>`;
+                gradientSentence = 'This substantial gradient suggests significant pollution inputs or natural attenuation processes along the river continuum.';
             } else if (Math.abs(parseFloat(gradient)) > 20) {
-                interpretation += `This moderate gradient indicates measurable changes in water quality along the river system.<br><br>`;
+                gradientSentence = 'This moderate gradient indicates measurable changes in water quality along the river system.';
             } else {
-                interpretation += `This relatively stable pattern suggests consistent water quality conditions along the monitored reach.<br><br>`;
+                gradientSentence = 'This relatively stable pattern suggests consistent water quality conditions along the monitored reach.';
             }
-            
-            // Compliance assessment
+
+            // Compliance sentence (shared between both versions, no emojis in plain version)
+            let compliancePlain = '';
+            let complianceHTML = '';
             if (twqrExceed === 0) {
-                interpretation += `<strong>✅ Compliance Status:</strong> All ${totalPoints} measurements comply with the TWQR (${standards.twqr} ${paramDef.unit}), indicating acceptable water quality throughout the monitored river continuum.`;
+                compliancePlain = `Compliance Status: All ${totalPoints} measurements comply with the TWQR (${standards.twqr} ${paramDef.unit}), indicating acceptable water quality throughout the monitored river continuum.`;
+                complianceHTML  = `<strong>Compliance Status [COMPLIANT]:</strong> All ${totalPoints} measurements comply with the TWQR (${standards.twqr} ${paramDef.unit}), indicating acceptable water quality throughout the monitored river continuum.`;
             } else if (twqrExceed < totalPoints * 0.1) {
-                interpretation += `<strong>⚠️ Compliance Status:</strong> ${twqrExceed} of ${totalPoints} measurements (${(twqrExceed/totalPoints*100).toFixed(1)}%) exceed the TWQR. These isolated exceedances warrant investigation of localized pollution sources.`;
+                compliancePlain = `Compliance Status: ${twqrExceed} of ${totalPoints} measurements (${(twqrExceed/totalPoints*100).toFixed(1)}%) exceed the TWQR. These isolated exceedances warrant investigation of localised pollution sources.`;
+                complianceHTML  = `<strong>Compliance Status [WARNING]:</strong> ${twqrExceed} of ${totalPoints} measurements (${(twqrExceed/totalPoints*100).toFixed(1)}%) exceed the TWQR. These isolated exceedances warrant investigation of localised pollution sources.`;
             } else {
-                interpretation += `<strong>🚨 Compliance Status:</strong> ${twqrExceed} of ${totalPoints} measurements (${(twqrExceed/totalPoints*100).toFixed(1)}%) exceed the TWQR, indicating widespread water quality degradation. `;
-                
+                compliancePlain = `Compliance Status: ${twqrExceed} of ${totalPoints} measurements (${(twqrExceed/totalPoints*100).toFixed(1)}%) exceed the TWQR, indicating widespread water quality degradation. `;
+                complianceHTML  = `<strong>Compliance Status [EXCEEDANCE]:</strong> ${twqrExceed} of ${totalPoints} measurements (${(twqrExceed/totalPoints*100).toFixed(1)}%) exceed the TWQR, indicating widespread water quality degradation. `;
                 if (cevExceed > 0) {
-                    interpretation += `Furthermore, ${cevExceed} measurements exceed the CEV (${standards.cev} ${paramDef.unit}), requiring immediate investigation and remediation.`;
+                    const cevText = `Furthermore, ${cevExceed} measurements exceed the CEV (${standards.cev} ${paramDef.unit}), requiring immediate investigation and remediation.`;
+                    compliancePlain += cevText;
+                    complianceHTML  += cevText;
                 }
                 if (aevExceed > 0) {
-                    interpretation += ` Critically, ${aevExceed} measurements exceed the AEV (${standards.aev} ${paramDef.unit}), indicating acute environmental risk requiring urgent intervention.`;
+                    const aevText = ` Critically, ${aevExceed} measurements exceed the AEV (${standards.aev} ${paramDef.unit}), indicating acute environmental risk requiring urgent intervention.`;
+                    compliancePlain += aevText;
+                    complianceHTML  += aevText;
                 }
             }
-            
+
+            // ── PLAIN TEXT VERSION (for PDF/PNG export — no emojis, no HTML tags) ──
+            let cleanText = `River Continuum Analysis\n\n`;
+            cleanText += `Dataset Overview: Analysis of ${totalPoints} measurements across ${sites} monitoring sites along the river continuum, spanning ${yearRange}. `;
+            cleanText += `The ${getTrendLineLabel(trendLineType).toLowerCase()} shows the overall spatial trend of ${paramDef.name} concentrations along the river system.\n\n`;
+            cleanText += `Spatial Gradient: From upstream to downstream, ${paramDef.name} concentrations show a ${Math.abs(gradient)}% ${gradientDirection} `;
+            cleanText += `(from ${firstSiteAvg.toFixed(3)} to ${lastSiteAvg.toFixed(3)} ${paramDef.unit}). `;
+            cleanText += `${gradientSentence}\n\n`;
+            cleanText += compliancePlain;
+
+            // Store plain text for export
+            window.riverMonitoringInterpretationText = cleanText;
+
+            // ── HTML VERSION (for on-screen display only) ──
+            let interpretation = `<h4 style="margin-bottom: 15px; color: #2c3e50;">📊 River Continuum Analysis</h4>`;
+            interpretation += `<p style="line-height: 1.8; color: #34495e;">`;
+            interpretation += `<strong>Dataset Overview:</strong> Analysis of ${totalPoints} measurements across ${sites} monitoring sites along the river continuum, spanning ${yearRange}. `;
+            interpretation += `The ${getTrendLineLabel(trendLineType).toLowerCase()} shows the overall spatial trend of ${paramDef.name} concentrations along the river system.<br><br>`;
+            interpretation += `<strong>Spatial Gradient:</strong> From upstream to downstream, ${paramDef.name} concentrations show a ${Math.abs(gradient)}% ${gradientDirection} `;
+            interpretation += `(from ${firstSiteAvg.toFixed(3)} to ${lastSiteAvg.toFixed(3)} ${paramDef.unit}). `;
+            interpretation += `${gradientSentence}<br><br>`;
+            interpretation += complianceHTML;
             interpretation += `</p>`;
-            
-            // Set HTML first
+
             interpretDiv.innerHTML = interpretation;
-            
-            // Then extract plain text for download (remove HTML tags)
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = interpretation;
-            window.riverMonitoringInterpretationText = tempDiv.textContent || tempDiv.innerText;
         }
 
         async function downloadRiverMonitoringGraph(format) {
@@ -5407,20 +6477,15 @@ Site E - Downstream,-25.763000,28.203000</pre>
                 const imgData = canvas.toDataURL('image/png');
                 pdf.addImage(imgData, 'PNG', 15, headerStartY + 30, 180, 120);
                 
-                // Add interpretation text with proper formatting
+                // Add interpretation text
                 pdf.setFontSize(9);
                 pdf.setFont(undefined, 'normal');
                 
-                // Clean the interpretation text - remove HTML and special characters
-                let cleanText = interpretation
-                    .replace(/<[^>]*>/g, '') // Remove HTML tags
-                    .replace(/&nbsp;/g, ' ') // Replace non-breaking spaces
-                    .replace(/&amp;/g, '&')  // Replace &amp;
-                    .replace(/&lt;/g, '<')   // Replace &lt;
-                    .replace(/&gt;/g, '>')   // Replace &gt;
-                    .replace(/&quot;/g, '"') // Replace &quot;
-                    .replace(/&#39;/g, "'")  // Replace &#39;
-                    .replace(/\s+/g, ' ')    // Normalize whitespace
+                // interpretation is already plain text — just normalise whitespace and newlines
+                const cleanText = interpretation
+                    .replace(/\n\n/g, ' | ')
+                    .replace(/\n/g, ' ')
+                    .replace(/\s+/g, ' ')
                     .trim();
                 
                 // Split text into lines that fit the page width (180mm with margins = 170mm usable)
@@ -5451,946 +6516,322 @@ Site E - Downstream,-25.763000,28.203000</pre>
         }
 
         // ========================================
-        // RIVER NETWORK IMPORT & MAP FUNCTIONS (STAGE 1)
         // ========================================
-        
-        let riverNetworkData = null;
-        let sampleSitesData = null;
-        let riverMap = null;
-        let riverLayers = [];
-        let siteLayers = [];
-        let selectedBranches = {};
-        
-        function loadRiverNetwork(event) {
-            const file = event.target.files[0];
+        // RIVER STUDY SITE DISTANCE ASSESSMENT
+        // ========================================
+
+        var sdaMap         = null;
+        var sdaSites       = [];
+        var sdaSiteMarkers = [];
+        var sdaDrawing     = false;
+        var sdaDrawPoints  = [];
+        var sdaPolyline    = null;
+        var sdaTempMarkers = [];
+        var sdaAssignments = {};        // { siteNum: { distance, label } }
+        var sdaCurrentDist = 0;
+        var sdaTileLayerOsm = null;
+        var sdaTileLayerSat = null;
+        var sdaCurrentLayer = 'satellite';
+
+        function loadSiteDistanceCSV(event) {
+            var file = event.target.files[0];
             if (!file) return;
-            
-            const reader = new FileReader();
+            var reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    riverNetworkData = JSON.parse(e.target.result);
-                    document.getElementById('networkFileStatus').innerHTML = 
-                        `✅ <span style="color: green;">Loaded: ${file.name}</span>`;
-                    
-                    // Check if we have both files loaded
-                    if (riverNetworkData && sampleSitesData) {
-                        displayRiverMap();
-                    } else if (riverNetworkData) {
-                        displayRiverMap(); // Show network even without sites
+                    var text = e.target.result.replace(/^\uFEFF/, '');
+                    var lines = text.split(/\r?\n/).filter(function(l) { return l.trim(); });
+                    if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row.');
+                    var hdr = lines[0].trim().toLowerCase();
+                    if (hdr !== 'name,latitude,longitude') throw new Error('Header must be exactly: name,latitude,longitude');
+                    var sites = [];
+                    var errors = [];
+                    for (var i = 1; i < lines.length; i++) {
+                        var parts = lines[i].trim().split(',');
+                        if (parts.length < 3) { errors.push('Row ' + (i+1) + ': need 3 columns'); continue; }
+                        var name = parts.slice(0, parts.length - 2).join(',').trim();
+                        var lat  = parseFloat(parts[parts.length - 2]);
+                        var lon  = parseFloat(parts[parts.length - 1]);
+                        if (!name) { errors.push('Row ' + (i+1) + ': empty name'); continue; }
+                        if (isNaN(lat) || lat < -90 || lat > 90)   { errors.push('Row ' + (i+1) + ': invalid latitude'); continue; }
+                        if (isNaN(lon) || lon < -180 || lon > 180) { errors.push('Row ' + (i+1) + ': invalid longitude'); continue; }
+                        sites.push({ name: name, lat: lat, lon: lon });
                     }
-                } catch (err) {
-                    document.getElementById('networkFileStatus').innerHTML = 
-                        `❌ <span style="color: red;">Error loading file: ${err.message}</span>`;
-                    console.error('Error loading river network:', err);
+                    if (errors.length) alert('CSV warnings:\n' + errors.join('\n'));
+                    if (!sites.length) throw new Error('No valid sites found.');
+                    sdaSites = sites;
+                    document.getElementById('sdaCsvStatus').innerHTML = '<span style="color:#1e8449; font-weight:600;">✅ ' + sites.length + ' site(s) loaded: ' + sites.map(function(s){return s.name;}).join(', ') + '</span>';
+                    initSdaMap();
+                } catch(err) {
+                    document.getElementById('sdaCsvStatus').innerHTML = '<span style="color:#c0392b; font-weight:600;">❌ ' + err.message + '</span>';
                 }
             };
             reader.readAsText(file);
         }
-        
-        function loadSampleSites(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const fileContent = e.target.result;
-                    const fileName = file.name.toLowerCase();
-                    
-                    // Check if CSV or JSON
-                    if (fileName.endsWith('.csv')) {
-                        // Convert CSV to JSON
-                        sampleSitesData = parseCSVToJSON(fileContent, fileName);
-                        
-                        if (sampleSitesData && sampleSitesData.sites) {
-                            document.getElementById('sitesFileStatus').innerHTML = 
-                                `✅ <span style="color: green;">CSV converted: ${file.name} (${sampleSitesData.sites.length} sites)</span>`;
-                        }
-                    } else {
-                        // Parse JSON directly
-                        sampleSitesData = JSON.parse(fileContent);
-                        document.getElementById('sitesFileStatus').innerHTML = 
-                            `✅ <span style="color: green;">Loaded: ${file.name} (${sampleSitesData.sites ? sampleSitesData.sites.length : 0} sites)</span>`;
-                    }
-                    
-                    // Check if we have both files loaded
-                    if (riverNetworkData && sampleSitesData) {
-                        displayRiverMap();
-                    }
-                } catch (err) {
-                    document.getElementById('sitesFileStatus').innerHTML = 
-                        `❌ <span style="color: red;">Error: ${err.message}</span>`;
-                    console.error('Error loading sample sites:', err);
-                }
-            };
-            reader.readAsText(file);
-        }
-        
-        function parseCSVToJSON(csvText, fileName) {
-            // Remove BOM if present
-            csvText = csvText.replace(/^\uFEFF/, '');
-            
-            // Split into lines
-            const lines = csvText.split(/\r?\n/).filter(line => line.trim());
-            
-            if (lines.length < 2) {
-                throw new Error('CSV file must have at least a header row and one data row');
-            }
-            
-            // Get header
-            const header = lines[0].trim();
-            
-            // Validate header EXACTLY
-            if (header !== 'name,latitude,longitude') {
-                throw new Error(`Header must be EXACTLY: name,latitude,longitude\nYour header: ${header}\n\nCheck: lowercase, no spaces, correct order!`);
-            }
-            
-            // Parse data rows
-            const sites = [];
-            const errors = [];
-            
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue; // Skip empty lines
-                
-                // Split by comma, but handle commas in site names
-                // Simple approach: split by comma, then rejoin first parts if more than 3 parts
-                const parts = line.split(',');
-                
-                if (parts.length < 3) {
-                    errors.push(`Line ${i + 1}: Not enough columns. Expected 3, got ${parts.length}`);
-                    continue;
-                }
-                
-                // If more than 3 parts, assume commas in name
-                let name, latitude, longitude;
-                
-                if (parts.length > 3) {
-                    // Rejoin all but last 2 parts as name
-                    name = parts.slice(0, parts.length - 2).join(',').trim();
-                    latitude = parts[parts.length - 2].trim();
-                    longitude = parts[parts.length - 1].trim();
-                } else {
-                    name = parts[0].trim();
-                    latitude = parts[1].trim();
-                    longitude = parts[2].trim();
-                }
-                
-                // Validate latitude
-                const lat = parseFloat(latitude);
-                if (isNaN(lat) || lat < -90 || lat > 90) {
-                    errors.push(`Line ${i + 1}: Invalid latitude "${latitude}" (must be -90 to 90)`);
-                    continue;
-                }
-                
-                // Validate longitude
-                const lon = parseFloat(longitude);
-                if (isNaN(lon) || lon < -180 || lon > 180) {
-                    errors.push(`Line ${i + 1}: Invalid longitude "${longitude}" (must be -180 to 180)`);
-                    continue;
-                }
-                
-                // Validate name
-                if (!name || name.length === 0) {
-                    errors.push(`Line ${i + 1}: Site name cannot be empty`);
-                    continue;
-                }
-                
-                sites.push({
-                    name: name,
-                    latitude: lat,
-                    longitude: lon
+
+        function initSdaMap() {
+            document.getElementById('sdaMapContainer').style.display = 'block';
+            if (!sdaMap) {
+                sdaMap = L.map('sdaMap').setView([-29.0, 25.0], 6);
+
+                sdaTileLayerSat = L.tileLayer(
+                    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                    { attribution: 'Tiles &copy; Esri', maxZoom: 19 }
+                ).addTo(sdaMap);
+
+                sdaTileLayerOsm = L.tileLayer(
+                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }
+                );
+
+                sdaMap.on('click', function(e) {
+                    if (sdaDrawing) sdaMapClick(e);
                 });
+            } else {
+                // Clear old markers
+                sdaSiteMarkers.forEach(function(m) { sdaMap.removeLayer(m); });
+                sdaSiteMarkers = [];
             }
-            
-            // Report errors if any
-            if (errors.length > 0) {
-                const errorMsg = `CSV Parsing Errors:\n\n${errors.join('\n')}\n\n${sites.length} sites loaded successfully.`;
-                
-                if (sites.length === 0) {
-                    throw new Error(errorMsg);
-                } else {
-                    alert(`⚠️ ${errorMsg}`);
-                }
-            }
-            
-            if (sites.length === 0) {
-                throw new Error('No valid sites found in CSV file');
-            }
-            
-            return { sites: sites };
-        }
-        
-        function showCSVFormatGuide() {
-            const guide = document.getElementById('csvFormatGuide');
-            guide.style.display = guide.style.display === 'none' ? 'block' : 'none';
-            
-            if (guide.style.display === 'block') {
-                guide.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-        }
-        
-        function downloadCSVTemplate() {
-            const csvContent = `name,latitude,longitude
-Site A - Upstream,-25.738000,28.177000
-Site B - Confluence,-25.742000,28.182000
-Site C - Midstream,-25.752000,28.192000
-Site D - Tributary,-25.754000,28.196000
-Site E - Downstream,-25.763000,28.203000`;
-            
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            
-            link.setAttribute('href', url);
-            link.setAttribute('download', 'sample_sites_template.csv');
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            alert('✅ Template downloaded!\n\nEdit this file with your own site data.\nKeep the header row exactly as-is: name,latitude,longitude');
-        }
-        
-        function displayRiverMap() {
-            // Show map container
-            document.getElementById('riverMapContainer').style.display = 'block';
-            
-            // Initialize map if not already done
-            if (!riverMap) {
-                riverMap = L.map('riverMap').setView([-25.75, 28.19], 10);
-                
-                // Add OpenStreetMap tile layer
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors',
-                    maxZoom: 18
-                }).addTo(riverMap);
-            }
-            
-            // Clear existing layers
-            riverLayers.forEach(layer => riverMap.removeLayer(layer));
-            siteLayers.forEach(layer => riverMap.removeLayer(layer));
-            riverLayers = [];
-            siteLayers = [];
-            selectedBranches = {};
-            
-            // Add river network
-            if (riverNetworkData) {
-                const networkBounds = [];
-                
-                // Handle different GeoJSON structures
-                const features = riverNetworkData.type === 'FeatureCollection' 
-                    ? riverNetworkData.features 
-                    : [riverNetworkData];
-                
-                features.forEach((feature, index) => {
-                    if (feature.geometry) {
-                        const geomType = feature.geometry.type;
-                        
-                        // Handle both LineString and MultiLineString
-                        if (geomType === 'LineString' || geomType === 'MultiLineString') {
-                            const branchId = `branch_${index}`;
-                            const branchName = feature.properties?.name || feature.properties?.Name || `Branch ${index + 1}`;
-                            
-                            // Process coordinates based on geometry type
-                            if (geomType === 'LineString') {
-                                // Single LineString
-                                const coords = feature.geometry.coordinates.map(coord => [coord[1], coord[0]]); // Flip to [lat, lng]
-                                
-                                const line = L.polyline(coords, {
-                                    color: '#2196F3',
-                                    weight: 4,
-                                    opacity: 0.7,
-                                    branchId: branchId
-                                }).addTo(riverMap);
-                                
-                                line.on('click', function() {
-                                    selectBranch(branchId, branchName, line);
-                                });
-                                
-                                line.bindTooltip(branchName, { sticky: true });
-                                
-                                riverLayers.push(line);
-                                coords.forEach(coord => networkBounds.push(coord));
-                                
-                                // Initialize branch selection
-                                selectedBranches[branchId] = {
-                                    name: branchName,
-                                    type: null,
-                                    layer: line,
-                                    coords: feature.geometry.coordinates
-                                };
-                                
-                            } else if (geomType === 'MultiLineString') {
-                                // MultiLineString - multiple line segments
-                                feature.geometry.coordinates.forEach((lineCoords, segmentIndex) => {
-                                    const coords = lineCoords.map(coord => [coord[1], coord[0]]); // Flip to [lat, lng]
-                                    const segmentBranchId = `${branchId}_seg${segmentIndex}`;
-                                    const segmentBranchName = `${branchName} (Segment ${segmentIndex + 1})`;
-                                    
-                                    const line = L.polyline(coords, {
-                                        color: '#2196F3',
-                                        weight: 4,
-                                        opacity: 0.7,
-                                        branchId: segmentBranchId
-                                    }).addTo(riverMap);
-                                    
-                                    line.on('click', function() {
-                                        selectBranch(segmentBranchId, segmentBranchName, line);
-                                    });
-                                    
-                                    line.bindTooltip(segmentBranchName, { sticky: true });
-                                    
-                                    riverLayers.push(line);
-                                    coords.forEach(coord => networkBounds.push(coord));
-                                    
-                                    // Initialize branch selection
-                                    selectedBranches[segmentBranchId] = {
-                                        name: segmentBranchName,
-                                        type: null,
-                                        layer: line,
-                                        coords: lineCoords
-                                    };
-                                });
-                            }
-                        }
-                    }
+
+            // Plot CSV sites
+            var bounds = [];
+            sdaSites.forEach(function(site) {
+                var icon = L.divIcon({
+                    className: '',
+                    html: '<div style="background:#e74c3c; border:2px solid white; border-radius:50%; width:14px; height:14px; box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>',
+                    iconSize: [14, 14],
+                    iconAnchor: [7, 7]
                 });
-                
-                // Fit map to network bounds
-                if (networkBounds.length > 0) {
-                    riverMap.fitBounds(networkBounds, { padding: [50, 50] });
-                }
-                
-                // Show branch designation panel
-                updateBranchPanel();
-            }
-            
-            // Add sample sites
-            if (sampleSitesData && sampleSitesData.sites) {
-                sampleSitesData.sites.forEach((site, index) => {
-                    const marker = L.circleMarker([site.latitude, site.longitude], {
-                        radius: 8,
-                        fillColor: '#f44336',
-                        color: '#fff',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    }).addTo(riverMap);
-                    
-                    marker.bindPopup(`<strong>${site.name || `Site ${index + 1}`}</strong><br>
-                                     Lat: ${site.latitude.toFixed(6)}<br>
-                                     Lon: ${site.longitude.toFixed(6)}`);
-                    
-                    siteLayers.push(marker);
-                });
-            }
-        }
-        
-        function selectBranch(branchId, branchName, layer) {
-            // Highlight selected branch
-            riverLayers.forEach(l => {
-                if (l.options.branchId === branchId) {
-                    l.setStyle({ color: '#ff9800', weight: 6 });
-                } else {
-                    l.setStyle({ color: '#2196F3', weight: 4 });
-                }
+                var marker = L.marker([site.lat, site.lon], { icon: icon })
+                    .bindPopup('<strong>' + site.name + '</strong><br>' + site.lat.toFixed(5) + ', ' + site.lon.toFixed(5))
+                    .addTo(sdaMap);
+                var label = L.tooltip({ permanent: true, direction: 'top', offset: [0, -10], className: 'sda-label' })
+                    .setContent(site.name);
+                marker.bindTooltip(label);
+                sdaSiteMarkers.push(marker);
+                bounds.push([site.lat, site.lon]);
             });
-            
-            // Focus on branch designation panel
-            document.getElementById('branchDesignationPanel').style.display = 'block';
-            const branchItem = document.getElementById(`branchItem_${branchId}`);
-            if (branchItem) {
-                branchItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                branchItem.style.background = '#fff3cd';
-                setTimeout(() => {
-                    branchItem.style.background = 'white';
-                }, 1000);
-            }
+
+            if (bounds.length) sdaMap.fitBounds(bounds, { padding: [40, 40] });
+            setTimeout(function() { sdaMap.invalidateSize(); }, 200);
         }
-        
-        function updateBranchPanel() {
-            const panel = document.getElementById('branchDesignationPanel');
-            const branchList = document.getElementById('branchList');
-            
-            panel.style.display = 'block';
-            branchList.innerHTML = '';
-            
-            Object.keys(selectedBranches).forEach(branchId => {
-                const branch = selectedBranches[branchId];
-                
-                const branchItem = document.createElement('div');
-                branchItem.id = `branchItem_${branchId}`;
-                branchItem.style.cssText = 'padding: 12px; background: white; border-radius: 8px; border: 2px solid #e0e0e0; margin-bottom: 10px;';
-                
-                branchItem.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 8px;">
-                        <div style="flex: 1; font-weight: 600; color: #2c3e50;">
-                            <span style="display: inline-block; width: 20px; height: 4px; background: #2196F3; margin-right: 8px;"></span>
-                            ${branch.name}
-                        </div>
-                        <select id="branchType_${branchId}" onchange="updateBranchType('${branchId}', this.value)" 
-                                style="padding: 8px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 0.9rem; min-width: 150px;">
-                            <option value="">-- Select Type --</option>
-                            <option value="mainstem">Mainstem</option>
-                            <option value="tributary">Tributary</option>
-                        </select>
-                        <button onclick="highlightBranch('${branchId}')" 
-                                style="padding: 8px 12px; background: #e3f2fd; border: 1px solid #2196F3; border-radius: 6px; cursor: pointer;">
-                            📍 Show on Map
-                        </button>
-                    </div>
-                    <div id="branchDetails_${branchId}" style="display: none; padding-top: 8px; border-top: 1px solid #e0e0e0;">
-                        <!-- Dynamic content based on branch type -->
-                    </div>
-                `;
-                
-                branchList.appendChild(branchItem);
-            });
-        }
-        
-        function updateBranchType(branchId, type) {
-            if (selectedBranches[branchId]) {
-                selectedBranches[branchId].type = type;
-                
-                // Update line color
-                const layer = selectedBranches[branchId].layer;
-                if (type === 'mainstem') {
-                    layer.setStyle({ color: '#2196F3', weight: 5 });
-                } else if (type === 'tributary') {
-                    layer.setStyle({ color: '#4caf50', weight: 4 });
-                }
-                
-                // Show appropriate detail fields
-                const detailsDiv = document.getElementById(`branchDetails_${branchId}`);
-                
-                if (type === 'mainstem') {
-                    // Show segment number input only (flow sequence is implied by segment order!)
-                    const currentSegment = selectedBranches[branchId].segmentNumber || '';
-                    
-                    detailsDiv.innerHTML = `
-                        <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <label style="font-weight: 600; color: #2c3e50; min-width: 160px;">Mainstem Segment #:</label>
-                                <input type="number" 
-                                       id="segmentNum_${branchId}" 
-                                       value="${currentSegment}"
-                                       min="1" 
-                                       placeholder="1, 2, 3..." 
-                                       onchange="updateSegmentNumber('${branchId}', this.value)"
-                                       style="width: 80px; padding: 6px 10px; border: 2px solid #2196F3; border-radius: 6px; font-size: 0.9rem;">
-                                <span style="color: #7f8c8d; font-size: 0.85rem;">Order from upstream (1) to downstream</span>
-                            </div>
-                            <div style="padding: 8px; background: #e3f2fd; border-left: 3px solid #2196F3; border-radius: 4px;">
-                                <span style="color: #1565c0; font-size: 0.85rem;">
-                                    ℹ️ Segment number determines flow order (Seg 1 → Seg 2 → Seg 3, etc.)
-                                </span>
-                            </div>
-                        </div>
-                    `;
-                    detailsDiv.style.display = 'block';
-                    
-                } else if (type === 'tributary') {
-                    // Show connection to segment dropdown ONLY (no flow sequence - it's automatic!)
-                    const currentConnection = selectedBranches[branchId].connectsToSegment || '';
-                    
-                    // Get list of mainstem segments
-                    const mainstemSegments = Object.keys(selectedBranches)
-                        .filter(id => selectedBranches[id].type === 'mainstem' && selectedBranches[id].segmentNumber)
-                        .map(id => selectedBranches[id].segmentNumber)
-                        .sort((a, b) => parseInt(a) - parseInt(b));
-                    
-                    let optionsHTML = '<option value="">-- Select Segment --</option>';
-                    mainstemSegments.forEach(seg => {
-                        optionsHTML += `<option value="${seg}" ${currentConnection == seg ? 'selected' : ''}>Segment ${seg}</option>`;
-                    });
-                    
-                    detailsDiv.innerHTML = `
-                        <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <label style="font-weight: 600; color: #2c3e50; min-width: 200px;">Connects to Mainstem Segment:</label>
-                                <select id="connectSeg_${branchId}" 
-                                        onchange="updateConnectionSegment('${branchId}', this.value)"
-                                        style="padding: 6px 10px; border: 2px solid #4caf50; border-radius: 6px; font-size: 0.9rem; min-width: 120px;">
-                                    ${optionsHTML}
-                                </select>
-                                ${mainstemSegments.length === 0 ? '<span style="color: #e74c3c; font-size: 0.85rem;">⚠️ Define mainstem segments first</span>' : ''}
-                            </div>
-                            <div style="padding: 8px; background: #e8f5e9; border-left: 3px solid #4caf50; border-radius: 4px;">
-                                <span style="color: #2e7d32; font-size: 0.85rem;">
-                                    ℹ️ Flow sequence will be automatically determined based on which segment this tributary connects to.
-                                </span>
-                            </div>
-                        </div>
-                    `;
-                    detailsDiv.style.display = 'block';
-                    
-                } else {
-                    // No type selected
-                    detailsDiv.style.display = 'none';
-                }
-            }
-        }
-        
-        function updateSegmentNumber(branchId, segmentNum) {
-            if (selectedBranches[branchId]) {
-                selectedBranches[branchId].segmentNumber = parseInt(segmentNum);
-                
-                // Refresh all tributary dropdowns in case they need updated options
-                Object.keys(selectedBranches).forEach(id => {
-                    if (selectedBranches[id].type === 'tributary') {
-                        updateBranchType(id, 'tributary');
-                    }
-                });
-            }
-        }
-        
-        function updateConnectionSegment(branchId, segmentNum) {
-            if (selectedBranches[branchId]) {
-                selectedBranches[branchId].connectsToSegment = parseInt(segmentNum);
-            }
-        }
-        
-        function updateFlowSequence(branchId, sequence) {
-            if (selectedBranches[branchId]) {
-                selectedBranches[branchId].flowSequence = parseInt(sequence);
-            }
-        }
-        
-        function highlightBranch(branchId) {
-            const branch = selectedBranches[branchId];
-            if (branch && branch.layer) {
-                // Briefly highlight the branch
-                const originalColor = branch.layer.options.color;
-                branch.layer.setStyle({ color: '#ff9800', weight: 8 });
-                
-                // Zoom to branch
-                riverMap.fitBounds(branch.layer.getBounds(), { padding: [50, 50] });
-                
-                // Reset color after animation
-                setTimeout(() => {
-                    branch.layer.setStyle({ 
-                        color: originalColor, 
-                        weight: branch.type === 'mainstem' ? 5 : 4 
-                    });
-                }, 1500);
-            }
-        }
-        
-        function processRiverNetwork() {
-            // Validate that all branches have been designated
-            let allDesignated = true;
-            let mainstemCount = 0;
-            const mainstemSegments = [];
-            const tributaries = [];
-            const errors = [];
-            
-            Object.keys(selectedBranches).forEach(branchId => {
-                const branch = selectedBranches[branchId];
-                
-                if (!branch.type) {
-                    allDesignated = false;
-                    return;
-                }
-                
-                if (branch.type === 'mainstem') {
-                    mainstemCount++;
-                    
-                    // Check if segment number is assigned
-                    if (!branch.segmentNumber) {
-                        errors.push(`${branch.name}: Mainstem segment number not assigned`);
-                    } else {
-                        mainstemSegments.push({
-                            id: branchId,
-                            name: branch.name,
-                            segmentNumber: branch.segmentNumber
-                        });
-                    }
-                } else if (branch.type === 'tributary') {
-                    tributaries.push({
-                        id: branchId,
-                        name: branch.name,
-                        connectsToSegment: branch.connectsToSegment
-                    });
-                    
-                    // Check if connection segment is assigned
-                    if (!branch.connectsToSegment) {
-                        errors.push(`${branch.name}: Must specify which mainstem segment it connects to`);
-                    }
-                }
-            });
-            
-            // Validation checks
-            if (!allDesignated) {
-                return alert('⚠️ Please designate all river branches as either Mainstem or Tributary before proceeding.');
-            }
-            
-            if (mainstemCount === 0) {
-                return alert('⚠️ You must designate at least one branch as Mainstem.');
-            }
-            
-            // Check for duplicate segment numbers
-            const segmentNumbers = mainstemSegments.map(s => s.segmentNumber);
-            const duplicates = segmentNumbers.filter((item, index) => segmentNumbers.indexOf(item) !== index);
-            if (duplicates.length > 0) {
-                errors.push(`Duplicate mainstem segment numbers found: ${[...new Set(duplicates)].join(', ')}`);
-            }
-            
-            // Check if segment numbers are continuous (Warning only, not error)
-            const sortedSegments = [...segmentNumbers].sort((a, b) => a - b);
-            let hasGaps = false;
-            for (let i = 0; i < sortedSegments.length - 1; i++) {
-                if (sortedSegments[i + 1] - sortedSegments[i] > 1) {
-                    hasGaps = true;
-                    break;
-                }
-            }
-            
-            // Check for duplicate flow sequences in MAINSTEM only
-            // NOTE: For mainstem, segment number IS the flow sequence, so this check is redundant
-            // Keeping it here for clarity but it will catch same duplicates as segment number check
-            
-            // Check if tributary connections are valid
-            tributaries.forEach(trib => {
-                if (trib.connectsToSegment && !segmentNumbers.includes(trib.connectsToSegment)) {
-                    errors.push(`${trib.name}: Connected to segment ${trib.connectsToSegment} which doesn't exist`);
-                }
-            });
-            
-            if (errors.length > 0) {
-                return alert('⚠️ Please fix the following errors:\n\n' + errors.map(e => '• ' + e).join('\n'));
-            }
-            
-            // Build flow order summary (auto-generated based on connections and segment numbers)
-            let flowSummary = '';
-            
-            // Create a structured flow order
-            const flowStructure = [];
-            
-            // Sort mainstem segments by segment number (segment number IS the flow order)
-            const sortedMainstems = [...mainstemSegments].sort((a, b) => a.segmentNumber - b.segmentNumber);
-            
-            // Build flow structure with tributaries inserted before their connected segments
-            sortedMainstems.forEach(mainBranch => {
-                // Find tributaries that connect to this segment
-                const connectedTribs = tributaries.filter(t => t.connectsToSegment === mainBranch.segmentNumber);
-                
-                // Add tributaries first (they flow in before this mainstem segment)
-                connectedTribs.forEach(trib => {
-                    flowStructure.push({
-                        name: trib.name,
-                        type: 'tributary',
-                        connectsTo: mainBranch.segmentNumber
-                    });
-                });
-                
-                // Then add the mainstem segment
-                flowStructure.push({
-                    name: mainBranch.name,
-                    type: 'mainstem',
-                    segmentNumber: mainBranch.segmentNumber
-                });
-            });
-            
-            // Generate flow summary text
-            if (flowStructure.length > 0) {
-                flowSummary = '\n\n🌊 Flow Order (Auto-Generated):\n';
-                flowStructure.forEach((item, index) => {
-                    if (item.type === 'tributary') {
-                        flowSummary += `   ${index + 1}. ↳ ${item.name} (tributary → connects to Segment ${item.connectsTo})\n`;
-                    } else {
-                        flowSummary += `   ${index + 1}. ${item.name} (mainstem Segment ${item.segmentNumber})\n`;
-                    }
-                });
-            }
-            
-            // Success message with detailed summary
-            const summary = `✅ Branch designations validated!\n\n` +
-                           `📊 Summary:\n` +
-                           `• ${mainstemCount} mainstem segment${mainstemCount > 1 ? 's' : ''} (${sortedSegments.join(', ')})\n` +
-                           `• ${tributaries.length} tributary/tributaries\n` +
-                           `• Total branches: ${mainstemCount + tributaries.length}` +
-                           flowSummary +
-                           (hasGaps ? `\n\n⚠️ Note: Gaps in mainstem segment numbers detected. This is allowed but ensure segments connect correctly.` : '') +
-                           `\n\n💡 Distance Calculation (Stage 2):\n` +
-                           `• Mainstem segments will be connected in order (${sortedSegments.join(' → ')})\n` +
-                           `• Distance = 0 km at the START of Segment ${Math.min(...sortedSegments)}\n` +
-                           `• Tributaries plot at their confluence point on the mainstem\n` +
-                           `• Flow order above shows water movement through the system\n\n` +
-                           `⏳ Stage 2 implementation coming next!\n\n` +
-                           `For now, you can manually enter site information using "Generate River Sites Form" button below.`;
-            
-            alert(summary);
-        }
-        
-        // ========================================
-        // STAGE 2: DISTANCE CALCULATION FUNCTIONS
-        // ========================================
-        
-        function calculateDistancesStage2() {
-            console.log('🚀 Starting Stage 2: Distance Calculations');
-            
-            // Check if we have network data
-            if (!riverNetworkData || !selectedBranches) {
-                alert('⚠️ Please complete branch designation first!\n\nGo to the map section above and designate all branches.');
-                return;
-            }
-            
-            // Get mainstem and tributary branches
-            const mainstemBranches = [];
-            const tributaryBranches = [];
-            
-            Object.keys(selectedBranches).forEach(branchId => {
-                const branch = selectedBranches[branchId];
-                if (branch.type === 'mainstem' && branch.segmentNumber) {
-                    mainstemBranches.push({
-                        id: branchId,
-                        name: branch.name,
-                        segmentNumber: branch.segmentNumber,
-                        coords: branch.coords,
-                        layer: branch.layer
-                    });
-                } else if (branch.type === 'tributary') {
-                    tributaryBranches.push({
-                        id: branchId,
-                        name: branch.name,
-                        coords: branch.coords,
-                        layer: branch.layer
-                    });
-                }
-            });
-            
-            if (mainstemBranches.length === 0) {
-                alert('⚠️ No mainstem segments found!\n\nPlease designate at least one branch as mainstem.');
-                return;
-            }
-            
-            // Sort mainstem by segment number
-            mainstemBranches.sort((a, b) => a.segmentNumber - b.segmentNumber);
-            
-            // Calculate mainstem distances
-            console.log('📏 Calculating mainstem distances...');
-            let cumulativeDistance = 0;
-            const mainstemInfo = [];
-            
-            mainstemBranches.forEach(branch => {
-                const line = turf.lineString(branch.coords);
-                const lengthKm = turf.length(line, {units: 'kilometers'});
-                
-                mainstemInfo.push({
-                    ...branch,
-                    startDistance: cumulativeDistance,
-                    endDistance: cumulativeDistance + lengthKm,
-                    length: lengthKm,
-                    line: line
-                });
-                
-                cumulativeDistance += lengthKm;
-            });
-            
-            console.log('✅ Mainstem distances calculated:', mainstemInfo);
-            
-            // Auto-detect tributary connections
-            console.log('🔍 Auto-detecting tributary connections...');
-            const tributaryInfo = [];
-            
-            tributaryBranches.forEach(trib => {
-                const tribLine = turf.lineString(trib.coords);
-                const tribEnd = turf.point(trib.coords[trib.coords.length - 1]);
-                
-                // Find closest mainstem segment
-                let closestSegment = null;
-                let minDistance = Infinity;
-                let confluencePoint = null;
-                let confluenceDistance = 0;
-                
-                mainstemInfo.forEach(mainBranch => {
-                    const nearest = turf.nearestPointOnLine(mainBranch.line, tribEnd);
-                    const distance = turf.distance(tribEnd, nearest, {units: 'kilometers'});
-                    
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestSegment = mainBranch.segmentNumber;
-                        confluencePoint = nearest.geometry.coordinates;
-                        
-                        // Calculate distance along mainstem to confluence
-                        const mainStart = turf.point(mainBranch.coords[0]);
-                        const lineToConfluence = turf.lineSlice(mainStart, nearest, mainBranch.line);
-                        const distAlongSegment = turf.length(lineToConfluence, {units: 'kilometers'});
-                        confluenceDistance = mainBranch.startDistance + distAlongSegment;
-                    }
-                });
-                
-                tributaryInfo.push({
-                    ...trib,
-                    connectsToSegment: closestSegment,
-                    confluenceDistance: confluenceDistance,
-                    confluencePoint: confluencePoint,
-                    line: tribLine
-                });
-                
-                console.log(`✅ ${trib.name} → Segment ${closestSegment} at ${confluenceDistance.toFixed(2)} km`);
-            });
-            
-            // Snap GPS sites to river network
-            if (!sampleSitesData || !sampleSitesData.sites || sampleSitesData.sites.length === 0) {
-                // No GPS sites - just show network info
-                showDistanceResults(mainstemInfo, tributaryInfo, null);
-                return;
-            }
-            
-            console.log('📍 Snapping GPS sites to river network...');
-            const snappedSites = [];
-            const allBranches = [
-                ...mainstemInfo.map(m => ({...m, type: 'mainstem'})),
-                ...tributaryInfo.map(t => ({...t, type: 'tributary'}))
-            ];
-            
-            sampleSitesData.sites.forEach(site => {
-                const sitePoint = turf.point([site.longitude, site.latitude]);
-                
-                // Find nearest branch
-                let closestBranch = null;
-                let minDist = Infinity;
-                let nearestPoint = null;
-                
-                allBranches.forEach(branch => {
-                    const nearest = turf.nearestPointOnLine(branch.line, sitePoint);
-                    const dist = turf.distance(sitePoint, nearest, {units: 'kilometers'});
-                    
-                    if (dist < minDist) {
-                        minDist = dist;
-                        closestBranch = branch;
-                        nearestPoint = nearest;
-                    }
-                });
-                
-                // Calculate distance for this site
-                let siteDistance;
-                if (closestBranch.type === 'mainstem') {
-                    // Distance along mainstem from start
-                    const segmentStart = turf.point(closestBranch.coords[0]);
-                    const lineToSite = turf.lineSlice(segmentStart, nearestPoint, closestBranch.line);
-                    const distAlongSegment = turf.length(lineToSite, {units: 'kilometers'});
-                    siteDistance = closestBranch.startDistance + distAlongSegment;
-                } else {
-                    // Tributary site - use confluence distance
-                    siteDistance = closestBranch.confluenceDistance;
-                }
-                
-                snappedSites.push({
-                    name: site.name,
-                    distance: siteDistance,
-                    branchType: closestBranch.type,
-                    branchName: closestBranch.name,
-                    snapDistance: minDist,
-                    snappedLat: nearestPoint.geometry.coordinates[1],
-                    snappedLon: nearestPoint.geometry.coordinates[0]
-                });
-            });
-            
-            // Sort by distance
-            snappedSites.sort((a, b) => a.distance - b.distance);
-            
-            console.log('✅ Sites snapped:', snappedSites);
-            
-            // Update form with distances
-            updateFormWithDistances(snappedSites);
-            
-            // Show results
-            showDistanceResults(mainstemInfo, tributaryInfo, snappedSites);
-        }
-        
-        function updateFormWithDistances(snappedSites) {
-            console.log('📝 Updating form with distances...');
-            
-            snappedSites.forEach((site, index) => {
-                const siteNum = index + 1;
-                
-                // Update site name if empty
-                const nameInput = document.getElementById(`riverSite_${siteNum}_name`);
-                if (nameInput && !nameInput.value) {
-                    nameInput.value = site.name;
-                }
-                
-                // Update distance
-                const distanceInput = document.getElementById(`riverSite_${siteNum}_distance`);
-                if (distanceInput) {
-                    distanceInput.value = site.distance.toFixed(2);
-                    distanceInput.style.background = '#e8f5e9';
-                    distanceInput.style.borderColor = '#4caf50';
-                }
-                
-                // Update branch type
-                const branchTypeSelect = document.getElementById(`riverSite_${siteNum}_branchType`);
-                if (branchTypeSelect && site.branchType) {
-                    branchTypeSelect.value = site.branchType;
-                    branchTypeSelect.style.background = site.branchType === 'tributary' ? '#fff3cd' : '#e3f2fd';
-                    branchTypeSelect.style.borderColor = site.branchType === 'tributary' ? '#ff9800' : '#3498db';
-                }
-            });
-            
-            console.log('✅ Form updated');
-        }
-        
-        function showDistanceResults(mainstemInfo, tributaryInfo, snappedSites) {
-            const statusDiv = document.getElementById('distanceCalculationStatus');
-            statusDiv.style.display = 'block';
-            
-            // Build mainstem summary
-            let mainstemSummary = '';
-            let totalLength = 0;
-            mainstemInfo.forEach(m => {
-                mainstemSummary += `   • Segment ${m.segmentNumber}: ${m.startDistance.toFixed(2)} → ${m.endDistance.toFixed(2)} km (length: ${m.length.toFixed(2)} km)\n`;
-                totalLength = m.endDistance;
-            });
-            
-            // Build tributary summary
-            let tributarySummary = '';
-            tributaryInfo.forEach(t => {
-                tributarySummary += `   • ${t.name} → Segment ${t.connectsToSegment} at ${t.confluenceDistance.toFixed(2)} km\n`;
-            });
-            
-            // Build site summary
-            let siteSummary = '';
-            if (snappedSites) {
-                snappedSites.forEach((site, i) => {
-                    siteSummary += `   ${i + 1}. ${site.name}: ${site.distance.toFixed(2)} km (${site.branchType})\n`;
-                });
-            }
-            
-            // Show success status
-            statusDiv.innerHTML = `
-                <div style="background: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; border-radius: 4px;">
-                    <strong style="color: #2e7d32;">✅ Distances Calculated!</strong><br>
-                    <span style="color: #555; font-size: 0.9rem;">
-                        Total mainstem length: ${totalLength.toFixed(2)} km<br>
-                        ${snappedSites ? snappedSites.length + ' sites processed' : 'No GPS sites'}
-                    </span>
-                </div>
-            `;
-            
-            // Show detailed alert
-            const alertMessage = `✅ Stage 2 Complete!\n\n` +
-                                `📏 Mainstem Distances:\n${mainstemSummary}\n` +
-                                `🔀 Tributary Confluences (Auto-Detected):\n${tributarySummary}\n` +
-                                (snappedSites ? `📍 Sample Sites:\n${siteSummary}\n` : '') +
-                                `✅ Distances have been populated in the form above!`;
-            
-            alert(alertMessage);
-            
-            // Reveal Step 2: Generate Graph
-            const step2Container = document.getElementById('step2Container');
-            if (step2Container) {
-                step2Container.style.display = 'block';
-                // Smooth scroll to Step 2
-                setTimeout(() => {
-                    step2Container.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 300);
+
+        function toggleSdaLayer(type) {
+            if (!sdaMap) return;
+            if (type === 'satellite') {
+                sdaMap.removeLayer(sdaTileLayerOsm);
+                sdaTileLayerSat.addTo(sdaMap);
+                sdaTileLayerSat.bringToBack();
+                document.getElementById('sdaBtnSat').style.background = '#2471a3';
+                document.getElementById('sdaBtnSat').style.color = 'white';
+                document.getElementById('sdaBtnOsm').style.background = 'white';
+                document.getElementById('sdaBtnOsm').style.color = '#2471a3';
+            } else {
+                sdaMap.removeLayer(sdaTileLayerSat);
+                sdaTileLayerOsm.addTo(sdaMap);
+                sdaTileLayerOsm.bringToBack();
+                document.getElementById('sdaBtnOsm').style.background = '#2471a3';
+                document.getElementById('sdaBtnOsm').style.color = 'white';
+                document.getElementById('sdaBtnSat').style.background = 'white';
+                document.getElementById('sdaBtnSat').style.color = '#2471a3';
             }
         }
 
-        // SEDIMENT QUALITY MONITORING TOOL FUNCTIONS
+        function startSdaDrawing() {
+            sdaDrawing = true;
+            sdaDrawPoints = [];
+            sdaCurrentDist = 0;
+            if (sdaPolyline) { sdaMap.removeLayer(sdaPolyline); sdaPolyline = null; }
+            sdaTempMarkers.forEach(function(m) { sdaMap.removeLayer(m); });
+            sdaTempMarkers = [];
+            document.getElementById('sdaMap').style.cursor = 'crosshair';
+            document.getElementById('sdaBtnStart').style.display = 'none';
+            document.getElementById('sdaBtnUndo').style.display = 'inline-block';
+            document.getElementById('sdaBtnClear').style.display = 'inline-block';
+            document.getElementById('sdaBtnFinish').style.display = 'inline-block';
+            document.getElementById('sdaLiveDistance').textContent = 'Click on the map to add points along the river channel…';
+            document.getElementById('sdaAssignPanel').style.display = 'none';
+        }
+
+        function sdaMapClick(e) {
+            var lat = e.latlng.lat;
+            var lon = e.latlng.lng;
+            if (sdaDrawPoints.length > 0) {
+                var prev = sdaDrawPoints[sdaDrawPoints.length - 1];
+                sdaCurrentDist += sdaHaversine(prev[0], prev[1], lat, lon);
+            }
+            sdaDrawPoints.push([lat, lon]);
+
+            // Vertex marker
+            var vIcon = L.divIcon({
+                className: '',
+                html: '<div style="background:#2471a3; border:2px solid white; border-radius:50%; width:10px; height:10px;"></div>',
+                iconSize: [10, 10], iconAnchor: [5, 5]
+            });
+            var vm = L.marker([lat, lon], { icon: vIcon }).addTo(sdaMap);
+            sdaTempMarkers.push(vm);
+
+            // Redraw polyline
+            if (sdaPolyline) sdaMap.removeLayer(sdaPolyline);
+            if (sdaDrawPoints.length > 1) {
+                sdaPolyline = L.polyline(sdaDrawPoints, { color: '#e67e22', weight: 3, dashArray: '6 4' }).addTo(sdaMap);
+            }
+
+            var distTxt = sdaDrawPoints.length < 2 ? 'First point set. Keep clicking…'
+                : '📏 Distance so far: <strong>' + sdaCurrentDist.toFixed(3) + ' km</strong> (' + sdaDrawPoints.length + ' points)';
+            document.getElementById('sdaLiveDistance').innerHTML = distTxt;
+        }
+
+        function undoSdaPoint() {
+            if (!sdaDrawPoints.length) return;
+            sdaDrawPoints.pop();
+            var lastM = sdaTempMarkers.pop();
+            if (lastM) sdaMap.removeLayer(lastM);
+            // Recalculate distance
+            sdaCurrentDist = 0;
+            for (var i = 1; i < sdaDrawPoints.length; i++) {
+                sdaCurrentDist += sdaHaversine(sdaDrawPoints[i-1][0], sdaDrawPoints[i-1][1], sdaDrawPoints[i][0], sdaDrawPoints[i][1]);
+            }
+            if (sdaPolyline) { sdaMap.removeLayer(sdaPolyline); sdaPolyline = null; }
+            if (sdaDrawPoints.length > 1) {
+                sdaPolyline = L.polyline(sdaDrawPoints, { color: '#e67e22', weight: 3, dashArray: '6 4' }).addTo(sdaMap);
+            }
+            var distTxt = sdaDrawPoints.length < 2 ? 'Point removed. Keep clicking…'
+                : '📏 Distance so far: <strong>' + sdaCurrentDist.toFixed(3) + ' km</strong> (' + sdaDrawPoints.length + ' points)';
+            document.getElementById('sdaLiveDistance').innerHTML = distTxt;
+        }
+
+        function clearSdaDrawing() {
+            sdaDrawing = false;
+            sdaDrawPoints = [];
+            sdaCurrentDist = 0;
+            if (sdaPolyline) { sdaMap.removeLayer(sdaPolyline); sdaPolyline = null; }
+            sdaTempMarkers.forEach(function(m) { sdaMap.removeLayer(m); });
+            sdaTempMarkers = [];
+            document.getElementById('sdaMap').style.cursor = 'crosshair';
+            document.getElementById('sdaBtnStart').style.display = 'inline-block';
+            document.getElementById('sdaBtnUndo').style.display = 'none';
+            document.getElementById('sdaBtnClear').style.display = 'none';
+            document.getElementById('sdaBtnFinish').style.display = 'none';
+            document.getElementById('sdaLiveDistance').textContent = '';
+            document.getElementById('sdaAssignPanel').style.display = 'none';
+        }
+
+        function finishSdaDrawing() {
+            if (sdaDrawPoints.length < 2) {
+                alert('Please click at least 2 points on the map to measure a distance.');
+                return;
+            }
+            sdaDrawing = false;
+            document.getElementById('sdaMap').style.cursor = '';
+
+            // Build assign panel
+            var numSites = parseInt(document.getElementById('numRiverSites').value) || 10;
+            var sel = document.getElementById('sdaSiteNumSelect');
+            sel.innerHTML = '<option value="">— Select site number —</option>';
+            for (var i = 1; i <= numSites; i++) {
+                sel.innerHTML += '<option value="' + i + '">Site ' + i + '</option>';
+            }
+
+            // Pre-fill label from CSV if matching
+            document.getElementById('sdaSiteLabel').value = '';
+
+            document.getElementById('sdaAssignDistance').innerHTML =
+                '📏 Measured distance: <strong>' + sdaCurrentDist.toFixed(3) + ' km</strong> (' + sdaDrawPoints.length + ' points)';
+            document.getElementById('sdaAssignPanel').style.display = 'block';
+            document.getElementById('sdaBtnStart').style.display = 'inline-block';
+            document.getElementById('sdaBtnUndo').style.display = 'none';
+            document.getElementById('sdaBtnClear').style.display = 'none';
+            document.getElementById('sdaBtnFinish').style.display = 'none';
+            document.getElementById('sdaAssignPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function assignSdaDistance() {
+            var siteNum = document.getElementById('sdaSiteNumSelect').value;
+            var label   = document.getElementById('sdaSiteLabel').value.trim();
+            if (!siteNum) { alert('Please select a site number.'); return; }
+
+            sdaAssignments[siteNum] = { distance: sdaCurrentDist.toFixed(3), label: label };
+
+            // If the river sites form already exists, populate it immediately
+            var distEl = document.getElementById('riverSite_' + siteNum + '_distance');
+            var nameEl = document.getElementById('riverSite_' + siteNum + '_name');
+            if (distEl) distEl.value = sdaCurrentDist.toFixed(3);
+            if (nameEl && label) nameEl.value = label;
+
+            // Keep the polyline on map as a record (light blue)
+            if (sdaPolyline) {
+                sdaPolyline.setStyle({ color: '#2471a3', weight: 2, dashArray: '4 3', opacity: 0.7 });
+                sdaPolyline = null;
+            }
+            sdaTempMarkers.forEach(function(m) { sdaMap.removeLayer(m); });
+            sdaTempMarkers = [];
+
+            document.getElementById('sdaAssignPanel').style.display = 'none';
+            document.getElementById('sdaLiveDistance').innerHTML =
+                '✅ <strong>' + sdaCurrentDist.toFixed(3) + ' km</strong> assigned to Site ' + siteNum + (label ? ' (' + label + ')' : '') + '. Draw another line or proceed to the form below.';
+
+            updateSdaTable();
+        }
+
+        function discardSdaMeasurement() {
+            clearSdaDrawing();
+        }
+
+        function updateSdaTable() {
+            var keys = Object.keys(sdaAssignments);
+            if (!keys.length) {
+                document.getElementById('sdaAssignmentsContainer').style.display = 'none';
+                return;
+            }
+            document.getElementById('sdaAssignmentsContainer').style.display = 'block';
+            keys.sort(function(a,b){ return parseInt(a)-parseInt(b); });
+            var html = '<table style="width:100%; border-collapse:collapse; font-size:0.88rem;">';
+            html += '<tr style="background:#eaf4fb;"><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Site #</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Label</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Distance (km)</th><th style="padding:8px 10px; border-bottom:2px solid #aed6f1;"></th></tr>';
+            keys.forEach(function(k) {
+                var a = sdaAssignments[k];
+                html += '<tr style="border-bottom:1px solid #e8eef3;">'
+                    + '<td style="padding:7px 10px; font-weight:700; color:#1a5276;">Site ' + k + '</td>'
+                    + '<td style="padding:7px 10px; color:#555;">' + (a.label || '—') + '</td>'
+                    + '<td style="padding:7px 10px; font-weight:700; color:#1e8449;">' + a.distance + ' km</td>'
+                    + '<td style="padding:7px 10px; text-align:right;"><button onclick="removeSdaAssignment(' + k + ')" style="background:#e74c3c; color:white; border:none; padding:3px 9px; border-radius:5px; cursor:pointer; font-size:0.8rem;">✕</button></td>'
+                    + '</tr>';
+            });
+            html += '</table>';
+            document.getElementById('sdaAssignmentsTable').innerHTML = html;
+        }
+
+        function removeSdaAssignment(siteNum) {
+            delete sdaAssignments[siteNum];
+            updateSdaTable();
+        }
+
+        function clearAllSdaDistances() {
+            if (!confirm('Clear all assigned distances?')) return;
+            sdaAssignments = {};
+            updateSdaTable();
+        }
+
+        function sdaHaversine(lat1, lon1, lat2, lon2) {
+            var R  = 6371;
+            var dL = (lat2 - lat1) * Math.PI / 180;
+            var dO = (lon2 - lon1) * Math.PI / 180;
+            var a  = Math.sin(dL/2) * Math.sin(dL/2)
+                   + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+                   * Math.sin(dO/2) * Math.sin(dO/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function downloadDistanceCsvTemplate() {
+            var csv = 'name,latitude,longitude\nPollution_Source,-33.9271,18.4622\nSite_1,-33.9350,18.4700\nSite_2,-33.9420,18.4790\nSite_3,-33.9510,18.4870\nSite_4,-33.9600,18.4950';
+            var blob = new Blob([csv], { type: 'text/csv' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'study_sites_template.csv';
+            a.click();
+        }
+
+        // SEDIMENT QUALITY MONITORING TOOL FUNCTIONS        // SEDIMENT QUALITY MONITORING TOOL FUNCTIONS
         
         let sedimentMonitoringChart = null;
         let sedimentMonitoringData = [];
