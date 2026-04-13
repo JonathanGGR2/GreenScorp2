@@ -1268,7 +1268,7 @@
                         <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
                             <div style="color: #17a2b8; font-size: 2rem; margin-bottom: 10px;">📊</div>
                             <div style="font-weight: 600; color: #2c5530;">Active Tools</div>
-                            <div style="color: #6c757d;">3 Available</div>
+                            <div style="color: #6c757d;">5 Available</div>
                         </div>
                         <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
                             <div style="color: #ffc107; font-size: 2rem; margin-bottom: 10px;">🔒</div>
@@ -2875,6 +2875,10 @@
                                             <div style="margin-top: 12px; padding: 12px; background: #f4f6f8; border-radius: 9px; border: 1px solid #dde2e8;">
                                                 <div style="font-weight: 700; color: #2c3e50; margin-bottom: 8px; font-size: 0.9rem;">📐 Distance Ruler</div>
                                                 <div style="font-size: 0.82rem; color: #666; margin-bottom: 10px;">Click <strong>Start Drawing</strong>, then click points along the river channel on the map. Click <strong>Finish</strong> when done.</div>
+                                                <div style="background: #eaf4fb; border-left: 3px solid #2471a3; padding: 8px 11px; border-radius: 0 7px 7px 0; font-size: 0.8rem; color: #1a5276; margin-bottom: 10px; line-height: 1.5;">
+                                                    <strong>Mainstem site:</strong> trace from previous site to this site along the river.<br>
+                                                    <strong>Tributary site (e.g. LB01):</strong> trace along the <em>mainstem</em> from the previous site to the confluence point — the point where the tributary joins the main river. Do not trace up the tributary itself. The cumulative distance at the confluence is what places the site on the x-axis.
+                                                </div>
                                                 <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
                                                     <button onclick="startSdaDrawing()" id="sdaBtnStart" style="padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.88rem; background: #27ae60; color: white; min-height: 38px;">✏️ Start Drawing</button>
                                                     <button onclick="undoSdaPoint()" id="sdaBtnUndo" style="padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.88rem; background: #f39c12; color: white; min-height: 38px; display: none;">↩ Undo Last Point</button>
@@ -2892,6 +2896,16 @@
                                             <div style="font-weight: 700; color: #1e8449; margin-bottom: 10px; font-size: 0.95rem;">Step 3 — Assign Distance to Site</div>
                                             <div id="sdaAssignSegment" style="font-size: 0.95rem; color: #555; margin-bottom: 4px;"></div>
                                             <div id="sdaAssignDistance" style="font-size: 1.05rem; font-weight: 700; color: #1e8449; margin-bottom: 12px;"></div>
+                                            <div style="margin-bottom: 12px;">
+                                                <label style="font-size: 0.85rem; font-weight: 700; color: #2c3e50; display: block; margin-bottom: 7px;">Site type:</label>
+                                                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                                                    <button id="sdaTypeBtnMain" onclick="selectSdaSiteType('mainstem')" style="flex: 1; padding: 10px; border: 2px solid #1a5276; border-radius: 9px; font-size: 0.9rem; font-weight: 700; cursor: pointer; min-height: 44px; background: #1a5276; color: white;">&#9670; Mainstem</button>
+                                                    <button id="sdaTypeBtnTrib" onclick="selectSdaSiteType('tributary')" style="flex: 1; padding: 10px; border: 2px solid #1D9E75; border-radius: 9px; font-size: 0.9rem; font-weight: 700; cursor: pointer; min-height: 44px; background: white; color: #2c3e50;">&#9651; Tributary</button>
+                                                </div>
+                                                <div id="sdaTypeHint" style="font-size: 0.82rem; color: #1a5276; padding: 7px 11px; background: #eaf4fb; border-radius: 7px; line-height: 1.5;">
+                                                    &#10003; Segment adds to the running total. Cumulative distance is assigned to this site.
+                                                </div>
+                                            </div>
                                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                                                 <div>
                                                     <label style="font-size: 0.85rem; font-weight: 700; color: #2c3e50; display: block; margin-bottom: 5px;">Assign to Site Number:</label>
@@ -5463,7 +5477,8 @@
         var sdaDrawPoints  = [];
         var sdaPolyline    = null;
         var sdaTempMarkers = [];
-        var sdaAssignments = {};        // { siteNum: { distance (cumulative), segment, label } }
+        var sdaAssignments = {};        // { siteNum: { distance (cumulative), segment, label, type } }
+        var sdaCurrentSiteType = 'mainstem';
         var sdaCurrentDist = 0;         // segment distance being drawn right now
         var sdaCumulativeDist = 0;      // running total from source across all assigned segments
         var sdaTileLayerOsm = null;
@@ -5692,6 +5707,10 @@
             document.getElementById('sdaAssignDistance').innerHTML =
                 '📍 Cumulative from source if assigned here: <strong>' + cumulative.toFixed(3) + ' km</strong>';
 
+            // Reset type selector to mainstem default
+            sdaCurrentSiteType = 'mainstem';
+            selectSdaSiteType('mainstem');
+
             document.getElementById('sdaAssignPanel').style.display = 'block';
             document.getElementById('sdaBtnStart').style.display = 'inline-block';
             document.getElementById('sdaBtnUndo').style.display = 'none';
@@ -5700,9 +5719,31 @@
             document.getElementById('sdaAssignPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
+        function selectSdaSiteType(type) {
+            sdaCurrentSiteType = type;
+            var btnMain = document.getElementById('sdaTypeBtnMain');
+            var btnTrib = document.getElementById('sdaTypeBtnTrib');
+            var hint    = document.getElementById('sdaTypeHint');
+            if (!btnMain || !btnTrib || !hint) return;
+            btnMain.style.background = type === 'mainstem'  ? '#1a5276' : 'white';
+            btnMain.style.color      = type === 'mainstem'  ? 'white'   : '#2c3e50';
+            btnTrib.style.background = type === 'tributary' ? '#1D9E75' : 'white';
+            btnTrib.style.color      = type === 'tributary' ? 'white'   : '#2c3e50';
+            if (type === 'mainstem') {
+                hint.innerHTML   = '&#10003; Segment adds to the running total. Cumulative distance is assigned to this site.';
+                hint.style.background = '#eaf4fb';
+                hint.style.color      = '#1a5276';
+            } else {
+                hint.innerHTML   = '&#10003; You traced along the <strong>mainstem to the confluence</strong>. The cumulative distance above places this tributary site at the correct position on the x-axis.';
+                hint.style.background = '#e1f5ee';
+                hint.style.color      = '#085041';
+            }
+        }
+
         function assignSdaDistance() {
             var siteNum = document.getElementById('sdaSiteNumSelect').value;
             var label   = document.getElementById('sdaSiteLabel').value.trim();
+            var siteType = sdaCurrentSiteType || 'mainstem';
             if (!siteNum) { alert('Please select a site number.'); return; }
 
             // Add segment to running cumulative total
@@ -5712,18 +5753,22 @@
             sdaAssignments[siteNum] = {
                 distance: cumulativeVal.toFixed(3),
                 segment:  sdaCurrentDist.toFixed(3),
-                label:    label
+                label:    label,
+                type:     siteType
             };
 
-            // Write cumulative value into the form if it exists
-            var distEl = document.getElementById('riverSite_' + siteNum + '_distance');
-            var nameEl = document.getElementById('riverSite_' + siteNum + '_name');
+            // Write cumulative value and type into the form if it exists
+            var distEl   = document.getElementById('riverSite_' + siteNum + '_distance');
+            var nameEl   = document.getElementById('riverSite_' + siteNum + '_name');
+            var typeEl   = document.getElementById('riverSite_' + siteNum + '_branchType');
             if (distEl) distEl.value = cumulativeVal.toFixed(3);
             if (nameEl && label) nameEl.value = label;
+            if (typeEl) typeEl.value = siteType;
 
-            // Keep the polyline on map as a record (light blue)
+            // Keep polyline on map — mainstem=blue, tributary=green
+            var polyColor = siteType === 'tributary' ? '#1D9E75' : '#2471a3';
             if (sdaPolyline) {
-                sdaPolyline.setStyle({ color: '#2471a3', weight: 2, dashArray: '4 3', opacity: 0.7 });
+                sdaPolyline.setStyle({ color: polyColor, weight: 2, dashArray: '4 3', opacity: 0.7 });
                 sdaPolyline = null;
             }
             sdaTempMarkers.forEach(function(m) { sdaMap.removeLayer(m); });
@@ -5753,15 +5798,19 @@
             document.getElementById('sdaAssignmentsContainer').style.display = 'block';
             keys.sort(function(a,b){ return parseInt(a)-parseInt(b); });
             var html = '<table style="width:100%; border-collapse:collapse; font-size:0.88rem;">';
-            html += '<tr style="background:#eaf4fb;"><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Site #</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Name</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Segment (km)</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Cumulative (km)</th><th style="padding:8px 10px; border-bottom:2px solid #aed6f1;"></th></tr>';
+            html += '<tr style="background:#eaf4fb;"><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Site #</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Name</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Type</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Segment (km)</th><th style="padding:8px 10px; text-align:left; border-bottom:2px solid #aed6f1;">Cumulative (km)</th><th style="padding:8px 10px; border-bottom:2px solid #aed6f1;"></th></tr>';
             keys.forEach(function(k) {
                 var a = sdaAssignments[k];
+                var typeIcon  = a.type === 'tributary' ? '&#9651; Trib' : '&#9670; Main';
+                var typeColor = a.type === 'tributary' ? '#085041' : '#1a5276';
+                var typeBg    = a.type === 'tributary' ? '#e1f5ee'  : '#eaf4fb';
                 html += '<tr style="border-bottom:1px solid #e8eef3;">'
                     + '<td style="padding:7px 10px; font-weight:700; color:#1a5276;">Site ' + k + '</td>'
                     + '<td style="padding:7px 10px; color:#555;">' + (a.label || '—') + '</td>'
+                    + '<td style="padding:7px 10px;"><span style="background:' + typeBg + '; color:' + typeColor + '; padding:2px 8px; border-radius:10px; font-weight:700; font-size:0.8rem;">' + typeIcon + '</span></td>'
                     + '<td style="padding:7px 10px; color:#888;">' + (a.segment || '—') + '</td>'
                     + '<td style="padding:7px 10px; font-weight:700; color:#1e8449;">' + a.distance + ' km</td>'
-                    + '<td style="padding:7px 10px; text-align:right;"><button onclick="removeSdaAssignment(' + k + ')" style="background:#e74c3c; color:white; border:none; padding:3px 9px; border-radius:5px; cursor:pointer; font-size:0.8rem;">✕</button></td>'
+                    + '<td style="padding:7px 10px; text-align:right;"><button onclick="removeSdaAssignment(' + k + ')" style="background:#e74c3c; color:white; border:none; padding:3px 9px; border-radius:5px; cursor:pointer; font-size:0.8rem;">&#10005;</button></td>'
                     + '</tr>';
             });
             html += '</table>';
