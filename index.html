@@ -11732,7 +11732,7 @@
             var lines   = doc.splitTextToSize(findTxt, cw);
             lines.forEach(function(ln) {
                 doc.setTextColor(50, 50, 50);
-                doc.text(ln, mg, y);
+                doc.text(ln, mg, y, { align: 'justify', maxWidth: cw });
                 y += 4.8;
                 if (y > 275) { doc.addPage(); y = 18; }
             });
