@@ -10846,10 +10846,12 @@
                 + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">'
                 + '<div style="font-size:2rem;">📋</div>'
                 + '<div><h1 style="font-size:1.55rem;font-weight:700;margin:0 0 3px;">Field Data Review</h1>'
-                + '<p style="font-size:0.83rem;opacity:0.85;margin:0;">Desktop report tool — upload a field session JSON, inspect all sites, and export Word reports</p></div>'
+                + '<p style="font-size:0.83rem;opacity:0.85;margin:0;">Desktop report tool — upload a field session JSON, inspect all sites, and export reports</p></div>'
                 + '</div></div>'
                 + '<div style="padding:24px 28px;">'
-                + '<div style="background:#f4f6f8;border:2px dashed #aed6f1;border-radius:14px;padding:28px;text-align:center;margin-bottom:20px;">'
+
+                // ── Upload box ──────────────────────────────────────────────
+                + '<div style="background:#f4f6f8;border:2px dashed #aed6f1;border-radius:14px;padding:28px;text-align:center;margin-bottom:0;">'
                 + '<div style="font-size:2.6rem;margin-bottom:10px;">📂</div>'
                 + '<p style="font-weight:700;color:#1a3c2a;font-size:1rem;margin-bottom:5px;">Upload Field Session JSON</p>'
                 + '<p style="font-size:0.83rem;color:#777;margin-bottom:16px;">Export file from the Field Data Collection tool — single site or all-sites JSON</p>'
@@ -10857,13 +10859,33 @@
                 + '<button onclick="document.getElementById(\'reviewFileInput\').click()" style="padding:11px 26px;background:linear-gradient(135deg,#2c5530,#4a9960);color:white;border:none;border-radius:10px;font-size:0.97rem;font-weight:700;cursor:pointer;">Choose JSON File</button>'
                 + '<div id="reviewUploadStatus" style="margin-top:10px;font-size:0.87rem;color:#555;min-height:18px;"></div>'
                 + '</div>'
+
+                // ── Content shown after upload ──────────────────────────────
                 + '<div id="reviewContent" style="display:none;">'
-                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:2px solid #eee;">'
+
+                // ── Locality download section ───────────────────────────────
+                + '<div style="background:#eaf4fb;border:1px solid #aed6f1;border-radius:12px;padding:18px 20px;margin-top:16px;">'
+                + '<div style="font-weight:700;color:#1a5276;font-size:0.97rem;margin-bottom:5px;">📍 Site Locality Download</div>'
+                + '<p style="font-size:0.83rem;color:#555;margin-bottom:14px;">Download GPS coordinates, site names, and field notes for all loaded sites.</p>'
+                + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+                + '<button onclick="downloadLocationsCSV()" style="padding:10px 20px;background:linear-gradient(135deg,#1a5276,#2471a3);color:white;border:none;border-radius:9px;font-size:0.9rem;font-weight:700;cursor:pointer;min-height:42px;">⬇ Download .csv</button>'
+                + '<button onclick="downloadLocationsKML()" style="padding:10px 20px;background:linear-gradient(135deg,#1e6b3a,#27ae60);color:white;border:none;border-radius:9px;font-size:0.9rem;font-weight:700;cursor:pointer;min-height:42px;">🌍 Download .kml</button>'
+                + '</div>'
+                + '<p style="font-size:0.78rem;color:#888;margin-top:10px;margin-bottom:0;">CSV: suitable for spreadsheets and GIS import.&nbsp;&nbsp;KML: open directly in Google Earth Pro — all sites appear as named pins.</p>'
+                + '</div>'
+
+                // ── Project / rename summary ────────────────────────────────
+                + '<div style="margin-top:16px;padding-bottom:14px;border-bottom:2px solid #eee;">'
                 + '<div id="reviewSummary" style="font-size:0.93rem;color:#2c3e50;font-weight:600;"></div>'
-                + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+                + '</div>'
+
+                // ── Word export + Clear ─────────────────────────────────────
+                + '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;margin-bottom:16px;">'
                 + '<button onclick="exportAllDocx()" style="padding:9px 18px;background:linear-gradient(135deg,#1a3c2a,#2c5530);color:white;border:none;border-radius:9px;font-size:0.9rem;font-weight:700;cursor:pointer;">📄 Export All Sites — Word Doc</button>'
                 + '<button onclick="clearReviewData()" style="padding:9px 14px;background:#c0392b;color:white;border:none;border-radius:9px;font-size:0.87rem;font-weight:700;cursor:pointer;">✕ Clear</button>'
-                + '</div></div>'
+                + '</div>'
+
+                // ── Site cards ──────────────────────────────────────────────
                 + '<div id="reviewSiteCards"></div>'
                 + '</div>'
                 + '</div>';
@@ -10987,6 +11009,70 @@
             alert('Renamed to "' + newName + '" — updated JSON downloaded. Re-upload to continue working with the new name.');
         }
 
+        function downloadLocationsCSV() {
+            if (!reviewData || !reviewData.sites || !reviewData.sites.length) { alert('No site data loaded.'); return; }
+            var proj = reviewData.projectName || 'GSCP_Field';
+            var rows = ['Project,Site Number,Site Name,Latitude,Longitude,Date/Time,Field Notes'];
+            reviewData.sites.forEach(function(s) {
+                var lat   = (s.gps && s.gps.latitude)  ? parseFloat(s.gps.latitude).toFixed(6)  : '';
+                var lon   = (s.gps && s.gps.longitude) ? parseFloat(s.gps.longitude).toFixed(6) : '';
+                var dt    = s.datetime ? s.datetime.replace('T', ' ') : '';
+                var notes = (s.fieldNotes || '').replace(/"/g, '""');
+                var sname = (s.siteName   || '').replace(/"/g, '""');
+                var pname = (s.projectName || proj).replace(/"/g, '""');
+                rows.push('"' + pname + '",' + s.siteNumber + ',"' + sname + '",' + lat + ',' + lon + ',"' + dt + '","' + notes + '"');
+            });
+            var csv  = rows.join('\r\n');
+            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            var url  = URL.createObjectURL(blob);
+            var a    = document.createElement('a');
+            a.href   = url;
+            a.download = 'GSCP_Localities_' + proj.replace(/[^a-zA-Z0-9]/g,'_') + '_' + new Date().toISOString().split('T')[0] + '.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadLocationsKML() {
+            if (!reviewData || !reviewData.sites || !reviewData.sites.length) { alert('No site data loaded.'); return; }
+            var proj = reviewData.projectName || 'GSCP Field Sites';
+            var esc  = function(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+
+            var placemarks = reviewData.sites.map(function(s) {
+                var lat  = (s.gps && s.gps.latitude)  ? parseFloat(s.gps.latitude)  : null;
+                var lon  = (s.gps && s.gps.longitude) ? parseFloat(s.gps.longitude) : null;
+                if (lat === null || lon === null) return '';
+                var projPart = (s.projectName || proj).replace(/\s+/g,'_').toUpperCase();
+                var sitePart = s.siteName ? s.siteName : ('Site_' + s.siteNumber);
+                var pinName  = esc(projPart + '_' + sitePart);
+                var dt    = s.datetime ? s.datetime.replace('T', ' ') : '';
+                var desc  = esc((dt ? 'Date/Time: ' + dt + '\n' : '') + (s.fieldNotes ? 'Notes: ' + s.fieldNotes : ''));
+                return '    <Placemark>\n'
+                     + '      <name>' + pinName + '</name>\n'
+                     + '      <description>' + desc + '</description>\n'
+                     + '      <styleUrl>#gsPin</styleUrl>\n'
+                     + '      <Point><coordinates>' + lon.toFixed(6) + ',' + lat.toFixed(6) + ',0</coordinates></Point>\n'
+                     + '    </Placemark>';
+            }).filter(Boolean).join('\n');
+
+            var kml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+                    + '<kml xmlns="http://www.opengis.net/kml/2.2">\n'
+                    + '  <Document>\n'
+                    + '    <name>' + esc(proj) + '</name>\n'
+                    + '    <description>Generated by Green Scorpions Environmental Compliance Portal</description>\n'
+                    + '    <Style id="gsPin"><IconStyle><color>ff0f9d58</color><scale>1.1</scale>'
+                    + '<Icon><href>http://maps.google.com/mapfiles/kml/paddle/grn-circle.png</href></Icon></IconStyle></Style>\n'
+                    + placemarks + '\n'
+                    + '  </Document>\n</kml>';
+
+            var blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+            var url  = URL.createObjectURL(blob);
+            var a    = document.createElement('a');
+            a.href   = url;
+            a.download = 'GSCP_Localities_' + proj.replace(/[^a-zA-Z0-9]/g,'_') + '_' + new Date().toISOString().split('T')[0] + '.kml';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         // ── DOCX EXPORT ─────────────────────────────────────────────────────
 
         function base64ToUint8Array(b64) {
@@ -11085,6 +11171,7 @@
                     : new Date().toLocaleDateString('en-ZA', { day:'2-digit', month:'long', year:'numeric' });
 
                 all.push(new D.Table({ width: { size: CONT_W, type: D.WidthType.DXA }, columnWidths: [2500, CONT_W - 2500], rows: [
+                    labelRow('Project',      (reviewData && reviewData.projectName) || '—'),
                     labelRow('Generated by', (reviewData && reviewData.exportedBy) || currentUser || 'Green Scorpions EMI'),
                     labelRow('Report date',  exportDateStr),
                     labelRow('Total sites',  String(sites.length)),
@@ -11102,10 +11189,12 @@
                 var lat   = (site.gps && site.gps.latitude)  ? parseFloat(site.gps.latitude).toFixed(5)  : 'Not recorded';
                 var lon   = (site.gps && site.gps.longitude) ? parseFloat(site.gps.longitude).toFixed(5) : 'Not recorded';
                 var dt    = site.datetime ? site.datetime.replace('T','  ') : 'Not recorded';
+                var projLabel = site.projectName || (reviewData && reviewData.projectName) || '';
 
-                all.push(sectionHead('Site ' + site.siteNumber + ':  ' + sname));
+                all.push(sectionHead((projLabel ? projLabel + ',  ' : '') + 'Site ' + site.siteNumber + ':  ' + sname));
 
                 all.push(new D.Table({ width: { size: CONT_W, type: D.WidthType.DXA }, columnWidths: [2500, CONT_W - 2500], rows: [
+                    labelRow('Project',      projLabel || '—'),
                     labelRow('Site name',    sname),
                     labelRow('GPS (DD)',     lat + ',  ' + lon),
                     labelRow('Date / Time',  dt),
@@ -11173,6 +11262,30 @@
                     }
                 }
             }
+
+            // ── LOCALITY MAP PAGE ──────────────────────────────────────────
+            try {
+                var projNameForMap = (reviewData && reviewData.projectName) || '';
+                var mapDataUrl = await generateFieldMapImage(sites, projNameForMap);
+                if (mapDataUrl) {
+                    all.push(new D.Paragraph({ children: [new D.PageBreak()] }));
+                    all.push(sectionHead('Site Locality Map'));
+                    // Convert data URL to Uint8Array for docx
+                    var mapBuf = base64ToUint8Array(mapDataUrl);
+                    // Scale to fit A4 content width (CONT_W DXA → px: 1DXA=1/20pt, 1pt=1/72in, 96dpi)
+                    // A4 content width ~160mm → ~605px at 96dpi; use 600x428 for landscape feel
+                    all.push(new D.Paragraph({
+                        alignment: D.AlignmentType.CENTER,
+                        spacing: { before: 100, after: 120 },
+                        children: [new D.ImageRun({ data: mapBuf, transformation: { width: 610, height: 418 }, type: 'jpg' })]
+                    }));
+                    all.push(new D.Paragraph({
+                        alignment: D.AlignmentType.CENTER,
+                        spacing: { before: 0, after: 200 },
+                        children: [new D.TextRun({ text: 'Figure: Site locality map — ' + (projNameForMap || 'field investigation') + '. Base imagery: ESRI World Imagery. Sites shown as yellow markers.', size: 17, italics: true, color: '888888', font: 'Arial' })]
+                    }));
+                }
+            } catch(mapErr) { console.warn('Map generation skipped:', mapErr); }
 
             // ── FOOTER LINE ────────────────────────────────────────────────
             all.push(new D.Paragraph({ spacing: { before: 480 },
@@ -11940,6 +12053,270 @@
             doc.save(fname);
         }
 
+
+
+        // ═══════════════════════════════════════════════════════════════════
+        // FIELD MAP — offscreen canvas tile renderer for Word doc export
+        // ═══════════════════════════════════════════════════════════════════
+
+        async function generateFieldMapImage(sites, projectName) {
+            // Filter to sites with valid GPS
+            var validSites = sites.filter(function(s) {
+                return s.gps && s.gps.latitude && s.gps.longitude
+                    && !isNaN(parseFloat(s.gps.latitude))
+                    && !isNaN(parseFloat(s.gps.longitude));
+            });
+            if (!validSites.length) return null;
+
+            var CVW = 1400, CVH = 960, PAD = 90;  // canvas px
+
+            // ── 1. Compute lat/lon bounds ────────────────────────────────
+            var lats = validSites.map(function(s){ return parseFloat(s.gps.latitude); });
+            var lons = validSites.map(function(s){ return parseFloat(s.gps.longitude); });
+            var minLat = Math.min.apply(null, lats);
+            var maxLat = Math.max.apply(null, lats);
+            var minLon = Math.min.apply(null, lons);
+            var maxLon = Math.max.apply(null, lons);
+
+            // Buffer: 15% of span or 0.005 degrees minimum
+            var latSpan = Math.max(maxLat - minLat, 0.005);
+            var lonSpan = Math.max(maxLon - minLon, 0.005);
+            minLat -= latSpan * 0.18; maxLat += latSpan * 0.18;
+            minLon -= lonSpan * 0.18; maxLon += lonSpan * 0.18;
+
+            // ── 2. Web Mercator helpers ──────────────────────────────────
+            function lat2y(lat) {
+                var r = Math.PI / 180;
+                return Math.log(Math.tan(Math.PI/4 + lat * r / 2));
+            }
+            function lon2x(lon) { return lon * Math.PI / 180; }
+
+            // Tile coords from lat/lon at zoom z
+            function latLonToTileXY(lat, lon, z) {
+                var n = Math.pow(2, z);
+                var tx = ((lon + 180) / 360) * n;
+                var ty = (1 - Math.log(Math.tan(lat * Math.PI / 180)
+                          + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
+                return { tx: tx, ty: ty };
+            }
+
+            // ── 3. Pick zoom level ───────────────────────────────────────
+            var zoom = 17;
+            while (zoom > 5) {
+                var tl = latLonToTileXY(maxLat, minLon, zoom);
+                var br = latLonToTileXY(minLat, maxLon, zoom);
+                var pxW = (br.tx - tl.tx) * 256;
+                var pxH = (br.ty - tl.ty) * 256;
+                if (pxW <= CVW - PAD * 2 && pxH <= CVH - PAD * 2) break;
+                zoom--;
+            }
+
+            // ── 4. Mercator to canvas pixel helpers ──────────────────────
+            var tlTile = latLonToTileXY(maxLat, minLon, zoom);
+            var brTile = latLonToTileXY(minLat, maxLon, zoom);
+            // World pixel extent at this zoom
+            var tileSize = 256;
+            var worldPxL = tlTile.tx * tileSize;
+            var worldPxT = tlTile.ty * tileSize;
+            var worldPxR = brTile.tx * tileSize;
+            var worldPxB = brTile.ty * tileSize;
+            var spanX = worldPxR - worldPxL;
+            var spanY = worldPxB - worldPxT;
+            // Scale to fit within PAD-inset canvas
+            var scaleX = (CVW - PAD * 2) / spanX;
+            var scaleY = (CVH - PAD * 2 - 40) / spanY;  // 40 = top title bar
+            var sc = Math.min(scaleX, scaleY);
+            var offX = PAD + ((CVW - PAD * 2) - spanX * sc) / 2;
+            var offY = PAD + 40 + ((CVH - PAD * 2 - 40) - spanY * sc) / 2;
+
+            function worldPxToCanvas(wx, wy) {
+                return { x: offX + (wx - worldPxL) * sc, y: offY + (wy - worldPxT) * sc };
+            }
+            function latLonToCanvas(lat, lon) {
+                var tp = latLonToTileXY(lat, lon, zoom);
+                return worldPxToCanvas(tp.tx * tileSize, tp.ty * tileSize);
+            }
+
+            // ── 5. Draw tiles ────────────────────────────────────────────
+            var canvas = document.createElement('canvas');
+            canvas.width = CVW; canvas.height = CVH;
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#d0d8e0';
+            ctx.fillRect(0, 0, CVW, CVH);
+
+            var tileXMin = Math.floor(tlTile.tx);
+            var tileXMax = Math.ceil(brTile.tx);
+            var tileYMin = Math.floor(tlTile.ty);
+            var tileYMax = Math.ceil(brTile.ty);
+
+            var tilePromises = [];
+            for (var tx = tileXMin; tx <= tileXMax; tx++) {
+                for (var ty = tileYMin; ty <= tileYMax; ty++) {
+                    (function(ttx, tty) {
+                        var url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' +
+                                  zoom + '/' + tty + '/' + ttx;
+                        var p = new Promise(function(resolve) {
+                            var img = new Image();
+                            img.crossOrigin = 'anonymous';
+                            img.onload  = function() {
+                                var cx = worldPxToCanvas(ttx * tileSize, tty * tileSize);
+                                ctx.drawImage(img, cx.x, cx.y, tileSize * sc, tileSize * sc);
+                                resolve();
+                            };
+                            img.onerror = function() { resolve(); };  // grey fallback already drawn
+                            img.src = url;
+                        });
+                        tilePromises.push(p);
+                    })(tx, ty);
+                }
+            }
+
+            // Wait max 8 s for tiles
+            await Promise.race([
+                Promise.all(tilePromises),
+                new Promise(function(r){ setTimeout(r, 8000); })
+            ]);
+
+            // ── 6. Title bar ─────────────────────────────────────────────
+            ctx.fillStyle = 'rgba(26,60,42,0.88)';
+            ctx.fillRect(0, 0, CVW, 46);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('Site Locality Map' + (projectName ? '  —  ' + projectName : ''), 18, 30);
+            ctx.font = '13px Arial';
+            ctx.fillStyle = 'rgba(255,255,255,0.75)';
+            ctx.fillText(validSites.length + ' site' + (validSites.length !== 1 ? 's' : ''), CVW - 90, 30);
+
+            // ── 7. Site markers ──────────────────────────────────────────
+            validSites.forEach(function(site, i) {
+                var pt = latLonToCanvas(parseFloat(site.gps.latitude), parseFloat(site.gps.longitude));
+                var r = 8;
+                // Shadow
+                ctx.beginPath();
+                ctx.arc(pt.x + 1.5, pt.y + 1.5, r + 1, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                ctx.fill();
+                // Fill
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+                ctx.fillStyle = '#FFD600';
+                ctx.fill();
+                // Border
+                ctx.strokeStyle = '#1A3C2A';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+                // Label halo + text
+                var label = (site.siteName || 'Site ' + site.siteNumber);
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                var tw = ctx.measureText(label).width;
+                ctx.fillStyle = 'rgba(255,255,255,0.75)';
+                ctx.fillRect(pt.x - tw / 2 - 3, pt.y - r - 20, tw + 6, 16);
+                ctx.fillStyle = '#1A3C2A';
+                ctx.fillText(label, pt.x, pt.y - r - 8);
+            });
+
+            // ── 8. Legend (top-right) ────────────────────────────────────
+            var lgX = CVW - 130, lgY = 56, lgW = 112, lgH = 42;
+            ctx.fillStyle = 'rgba(255,255,255,0.50)';
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(lgX, lgY, lgW, lgH, 5);
+            ctx.fill(); ctx.stroke();
+            // Marker
+            ctx.beginPath();
+            ctx.arc(lgX + 18, lgY + 21, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFD600';
+            ctx.fill();
+            ctx.strokeStyle = '#1A3C2A';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // Text
+            ctx.fillStyle = '#1A3C2A';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('Sites', lgX + 30, lgY + 26);
+
+            // ── 9. Scale bar (bottom centre) ─────────────────────────────
+            var metersPerPx = (156543.03 * Math.cos(((maxLat + minLat) / 2) * Math.PI / 180)) / Math.pow(2, zoom) / sc;
+            // Choose a clean scale bar length
+            var candidates = [10,25,50,100,200,500,1000,2000,5000,10000,20000,50000];
+            var targetPx = 120;
+            var barMeters = candidates.reduce(function(prev, curr) {
+                return Math.abs(curr / metersPerPx - targetPx) < Math.abs(prev / metersPerPx - targetPx) ? curr : prev;
+            });
+            var barPx = barMeters / metersPerPx;
+            var sbX = CVW / 2 - barPx / 2;
+            var sbY = CVH - 38;
+            var barLabel = barMeters >= 1000 ? (barMeters / 1000) + ' km' : barMeters + ' m';
+            // Shadow box
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(sbX + 1, sbY + 1, barPx, 12);
+            // Alternating blocks
+            ctx.fillStyle = '#333333'; ctx.fillRect(sbX, sbY, barPx / 2, 12);
+            ctx.fillStyle = '#FFFFFF'; ctx.fillRect(sbX + barPx / 2, sbY, barPx / 2, 12);
+            ctx.strokeStyle = '#333333'; ctx.lineWidth = 1.2;
+            ctx.strokeRect(sbX, sbY, barPx, 12);
+            // Tick marks
+            ctx.beginPath();
+            ctx.moveTo(sbX, sbY); ctx.lineTo(sbX, sbY - 4);
+            ctx.moveTo(sbX + barPx / 2, sbY); ctx.lineTo(sbX + barPx / 2, sbY - 4);
+            ctx.moveTo(sbX + barPx, sbY); ctx.lineTo(sbX + barPx, sbY - 4);
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+            ctx.stroke();
+            // Labels
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'center';
+            // White halo
+            ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+            ctx.lineWidth = 3;
+            ctx.strokeText('0', sbX, sbY - 7);
+            ctx.strokeText(barLabel, sbX + barPx, sbY - 7);
+            ctx.fillStyle = 'white';
+            ctx.fillText('0', sbX, sbY - 7);
+            ctx.fillText(barLabel, sbX + barPx, sbY - 7);
+
+            // ── 10. North arrow (bottom-left) ────────────────────────────
+            var naX = 60, naY = CVH - 60, naR = 22;
+            // Background circle
+            ctx.beginPath();
+            ctx.arc(naX, naY, naR, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.80)';
+            ctx.fill();
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+            ctx.stroke();
+            // North half (dark)
+            ctx.beginPath();
+            ctx.moveTo(naX, naY - naR + 5);
+            ctx.lineTo(naX + 7, naY + 4);
+            ctx.lineTo(naX, naY);
+            ctx.closePath();
+            ctx.fillStyle = '#1A3C2A'; ctx.fill();
+            // South half (light)
+            ctx.beginPath();
+            ctx.moveTo(naX, naY - naR + 5);
+            ctx.lineTo(naX - 7, naY + 4);
+            ctx.lineTo(naX, naY);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill();
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 0.8;
+            ctx.stroke();
+            // N label
+            ctx.fillStyle = '#1A3C2A';
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('N', naX, naY + naR - 4);
+
+            // ── 11. Border ───────────────────────────────────────────────
+            ctx.strokeStyle = 'rgba(26,60,42,0.6)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(1, 1, CVW - 2, CVH - 2);
+
+            return canvas.toDataURL('image/jpeg', 0.88);
+        }
 
         // Initialize app when page loads
     </script>
