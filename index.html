@@ -9830,9 +9830,56 @@
         // FIELD DATA COLLECTION TOOL v3.0 — MOBILE FIRST
         // ========================================
 
-        const FIELD_STORAGE_KEY = 'gscp_field_v3';
-        let fieldSiteCounter = 0;
-        let fieldAutoSaveTimer = null;
+        const FIELD_STORAGE_KEY    = 'gscp_field_v4';
+        const FIELD_STORAGE_KEY_V3 = 'gscp_field_v3'; // legacy migration
+        var fieldSiteCounter  = 0;
+        var fieldAutoSaveTimer = null;
+        var fieldProjectsData  = null; // initialised below
+
+        // ── Project data initialisation ─────────────────────────────────────
+        (function initFieldData() {
+            var raw = localStorage.getItem(FIELD_STORAGE_KEY);
+            if (raw) { try { fieldProjectsData = JSON.parse(raw); } catch(e) {} }
+            // Migrate v3 flat session → Default Project
+            if (!fieldProjectsData || !fieldProjectsData.projects) {
+                var v3raw = localStorage.getItem(FIELD_STORAGE_KEY_V3);
+                if (v3raw) {
+                    try {
+                        var v3 = JSON.parse(v3raw);
+                        if (v3.sites && v3.sites.length) {
+                            var pid = 'proj_' + Date.now();
+                            fieldProjectsData = {
+                                projects: [{ id: pid, name: 'Default Project',
+                                    created: new Date().toISOString().slice(0,10),
+                                    counter: v3.counter || 0, sites: v3.sites, savedAt: v3.savedAt }],
+                                activeProjectId: pid
+                            };
+                            localStorage.setItem(FIELD_STORAGE_KEY, JSON.stringify(fieldProjectsData));
+                            localStorage.removeItem(FIELD_STORAGE_KEY_V3);
+                        }
+                    } catch(e) {}
+                }
+            }
+            // Ensure at least one project exists
+            if (!fieldProjectsData || !fieldProjectsData.projects || !fieldProjectsData.projects.length) {
+                var pid2 = 'proj_' + Date.now();
+                fieldProjectsData = {
+                    projects: [{ id: pid2, name: 'Default Project',
+                        created: new Date().toISOString().slice(0,10),
+                        counter: 0, sites: [], savedAt: null }],
+                    activeProjectId: pid2
+                };
+            }
+        })();
+
+        function getActiveProject() {
+            if (!fieldProjectsData || !fieldProjectsData.projects) return null;
+            var p = fieldProjectsData.projects.find(function(x) { return x.id === fieldProjectsData.activeProjectId; });
+            return p || fieldProjectsData.projects[0] || null;
+        }
+        function getCurrentProjectName() {
+            var p = getActiveProject(); return p ? p.name : '';
+        }
 
         const fieldParameters = {
             ph:          { name: 'pH',                       unit: 'pH units', step: '0.01',    icon: '🧪' },
@@ -9860,30 +9907,34 @@
 
         function fieldAutoSave() {
             clearTimeout(fieldAutoSaveTimer);
-            fieldAutoSaveTimer = setTimeout(() => {
+            fieldAutoSaveTimer = setTimeout(function() {
                 try {
-                    const data = collectAllFieldData();
-                    localStorage.setItem(FIELD_STORAGE_KEY, JSON.stringify({
-                        savedAt: new Date().toISOString(),
-                        counter: fieldSiteCounter,
-                        sites: data
-                    }));
-                    const indicator = document.getElementById('fieldSaveIndicator');
+                    var data = collectAllFieldData();
+                    var proj = getActiveProject();
+                    if (proj) {
+                        proj.sites   = data;
+                        proj.counter = fieldSiteCounter;
+                        proj.savedAt = new Date().toISOString();
+                    }
+                    fieldProjectsData.savedAt = new Date().toISOString();
+                    localStorage.setItem(FIELD_STORAGE_KEY, JSON.stringify(fieldProjectsData));
+                    var indicator = document.getElementById('fieldSaveIndicator');
                     if (indicator) {
                         indicator.textContent = '✅ Auto-saved';
                         indicator.style.color = '#a9dfbf';
-                        setTimeout(() => {
+                        setTimeout(function() {
                             indicator.textContent = '💾 Session active';
                             indicator.style.color = 'rgba(255,255,255,0.8)';
                         }, 2500);
                     }
-                } catch(e) { /* storage full or unavailable */ }
+                } catch(e) { /* storage full */ }
             }, 700);
         }
 
         function loadFieldTool() {
-            const container = document.getElementById('fieldToolContainer');
-            const hasSavedData = !!localStorage.getItem(FIELD_STORAGE_KEY);
+            var container = document.getElementById('fieldToolContainer');
+            var proj = getActiveProject();
+            var hasSavedData = !!(proj && proj.sites && proj.sites.length);
 
             container.innerHTML = `
                 <!-- MOBILE-FIRST HEADER -->
@@ -9891,7 +9942,7 @@
                     <div style="text-align: center; margin-bottom: 14px;">
                         <div style="font-size: 2rem; line-height: 1; margin-bottom: 4px;">📍</div>
                         <h1 style="font-size: 1.55rem; font-weight: 700; margin-bottom: 2px; line-height: 1.2;">Field Data Collection</h1>
-                        <p style="font-size: 0.82rem; opacity: 0.85; margin-bottom: 0;">Green Scorpions EMI Tool — v3.0</p>
+                        <p style="font-size: 0.82rem; opacity: 0.85; margin-bottom: 0;">Green Scorpions EMI Tool — v4.0</p>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 9px 14px; border-radius: 10px;">
                         <span style="font-size: 0.88rem;">Sites collected: <strong id="fieldSiteCount">0</strong></span>
@@ -9899,10 +9950,19 @@
                     </div>
                 </div>
 
+                <!-- PROJECT BAR -->
+                <div style="background: #1a3c2a; padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.12);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px;">
+                        <span style="color: rgba(255,255,255,0.75); font-size: 0.76rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">Project</span>
+                        <button onclick="addFieldProject()" style="padding: 5px 13px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); color: white; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer; min-height: 32px;">+ New Project</button>
+                    </div>
+                    <select id="fieldProjSelector" onchange="switchFieldProject(this.value)" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.25); color: white; font-size: 0.97rem; font-weight: 700; cursor: pointer; min-height: 44px;"></select>
+                </div>
+
                 <!-- SESSION RECOVERY BANNER -->
                 ${hasSavedData ? `
                 <div id="sessionRecoveryBanner" style="background: #fff8e1; border-left: 4px solid #f59f00; padding: 12px 15px; margin: 0 -30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                    <span style="font-size: 0.88rem; color: #7d5a00; font-weight: 600;">⚡ Unsaved session found — restore it?</span>
+                    <span style="font-size: 0.88rem; color: #7d5a00; font-weight: 600;">⚡ Saved sites found in this project — restore?</span>
                     <div style="display: flex; gap: 8px;">
                         <button onclick="restoreFieldSession()" style="background: #2e7d32; color: white; border: none; padding: 7px 16px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; min-height: 36px;">Restore</button>
                         <button onclick="dismissFieldRecovery()" style="background: #c62828; color: white; border: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; min-height: 36px;">Discard</button>
@@ -9919,20 +9979,27 @@
                         display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px;">
                         ➕&nbsp; Add New Site
                     </button>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <button onclick="exportAllFieldData()" style="
-                            padding: 13px 8px; border: none; border-radius: 10px; font-size: 0.92rem;
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                        <button onclick="exportCurrentProject()" style="
+                            padding: 11px 6px; border: none; border-radius: 10px; font-size: 0.82rem;
                             font-weight: 700; cursor: pointer; color: white; min-height: 48px;
-                            background: linear-gradient(135deg, #2471a3, #154360);
-                            box-shadow: 0 3px 10px rgba(36,113,163,0.35);">
-                            📥 Export All
+                            background: linear-gradient(135deg, #1a5276, #2471a3);
+                            box-shadow: 0 3px 10px rgba(36,113,163,0.3);">
+                            📥 This Project
+                        </button>
+                        <button onclick="exportAllFieldData()" style="
+                            padding: 11px 6px; border: none; border-radius: 10px; font-size: 0.82rem;
+                            font-weight: 700; cursor: pointer; color: white; min-height: 48px;
+                            background: linear-gradient(135deg, #0e3460, #154987);
+                            box-shadow: 0 3px 10px rgba(14,52,96,0.3);">
+                            📦 All Projects
                         </button>
                         <button onclick="clearAllFieldData()" style="
-                            padding: 13px 8px; border: none; border-radius: 10px; font-size: 0.92rem;
+                            padding: 11px 6px; border: none; border-radius: 10px; font-size: 0.82rem;
                             font-weight: 700; cursor: pointer; color: white; min-height: 48px;
                             background: linear-gradient(135deg, #c0392b, #7b241c);
                             box-shadow: 0 3px 10px rgba(192,57,43,0.35);">
-                            🗑️ Clear All
+                            🗑️ Clear Sites
                         </button>
                     </div>
                 </div>
@@ -9962,6 +10029,91 @@
             container.addEventListener('input', fieldAutoSave);
             container.addEventListener('change', fieldAutoSave);
             updateFieldSiteCount();
+            renderFieldProjectSelector();
+        }
+
+        function renderFieldProjectSelector() {
+            var sel = document.getElementById('fieldProjSelector');
+            if (!sel || !fieldProjectsData) return;
+            sel.innerHTML = '';
+            fieldProjectsData.projects.forEach(function(p) {
+                var opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name + ' (' + (p.sites ? p.sites.length : 0) + ' site' + ((p.sites && p.sites.length === 1) ? '' : 's') + ')';
+                opt.selected = (p.id === fieldProjectsData.activeProjectId);
+                sel.appendChild(opt);
+            });
+        }
+
+        function addFieldProject() {
+            var name = prompt('New project name:', '');
+            if (!name || !name.trim()) return;
+            // Save current project before switching
+            var cur = getActiveProject();
+            if (cur) {
+                cur.sites   = collectAllFieldData();
+                cur.counter = fieldSiteCounter;
+            }
+            var pid = 'proj_' + Date.now();
+            fieldProjectsData.projects.push({
+                id: pid, name: name.trim(),
+                created: new Date().toISOString().slice(0,10),
+                counter: 0, sites: [], savedAt: null
+            });
+            fieldProjectsData.activeProjectId = pid;
+            localStorage.setItem(FIELD_STORAGE_KEY, JSON.stringify(fieldProjectsData));
+            // Clear site cards and reset counter
+            fieldSiteCounter = 0;
+            var container = document.getElementById('fieldSitesContainer');
+            if (container) container.innerHTML = '<div id="fieldEmptyState" style="text-align:center;padding:50px 20px;color:#aaa;"><div style="font-size:3.2rem;margin-bottom:14px;">🗺️</div><h3 style="font-size:1.1rem;color:#888;margin-bottom:6px;">No sites yet</h3><p style="font-size:0.88rem;">Tap <strong>Add New Site</strong> to begin collecting field data</p></div>';
+            updateFieldSiteCount();
+            renderFieldProjectSelector();
+        }
+
+        function switchFieldProject(pid) {
+            if (pid === fieldProjectsData.activeProjectId) return;
+            // Persist current project's sites before switching
+            var cur = getActiveProject();
+            if (cur) {
+                cur.sites   = collectAllFieldData();
+                cur.counter = fieldSiteCounter;
+                cur.savedAt = new Date().toISOString();
+            }
+            fieldProjectsData.activeProjectId = pid;
+            localStorage.setItem(FIELD_STORAGE_KEY, JSON.stringify(fieldProjectsData));
+            // Clear and reload the new project's sites
+            var newProj = getActiveProject();
+            fieldSiteCounter = newProj ? (newProj.counter || 0) : 0;
+            var container = document.getElementById('fieldSitesContainer');
+            if (container) container.innerHTML = '<div id="fieldEmptyState" style="text-align:center;padding:50px 20px;color:#aaa;"><div style="font-size:3.2rem;margin-bottom:14px;">🗺️</div><h3 style="font-size:1.1rem;color:#888;margin-bottom:6px;">No sites yet</h3><p style="font-size:0.88rem;">Tap <strong>Add New Site</strong> to begin collecting field data</p></div>';
+            fieldSiteCounter = 0;
+            if (newProj && newProj.sites && newProj.sites.length) {
+                var emptyState = document.getElementById('fieldEmptyState');
+                if (emptyState) emptyState.remove();
+                newProj.sites.forEach(function(siteData) {
+                    addFieldSite(siteData);
+                    var siteId = 'fsite_' + fieldSiteCounter;
+                    restoreSiteData(siteId, siteData);
+                });
+            }
+            updateFieldSiteCount();
+            renderFieldProjectSelector();
+        }
+
+        function exportCurrentProject() {
+            var proj = getActiveProject();
+            if (!proj) return;
+            var sites = collectAllFieldData();
+            if (!sites.length) { alert('No sites in this project yet.'); return; }
+            var date = new Date().toISOString().split('T')[0];
+            downloadJSON({
+                tool: 'Green Scorpions Field Data Tool v4',
+                exportDate: new Date().toISOString(),
+                exportedBy: currentUser || 'unknown',
+                projectName: proj.name,
+                siteCount: sites.length,
+                sites: sites
+            }, 'GSCP_' + proj.name.replace(/[^a-zA-Z0-9]/g,'_') + '_' + date + '.json');
         }
 
         function buildSiteCardHTML(siteId, siteNum, prefill) {
@@ -10363,6 +10515,7 @@
             var latDisp  = lat !== '--' ? parseFloat(lat).toFixed(5) : '--';
             var lonDisp  = lon !== '--' ? parseFloat(lon).toFixed(5) : '--';
             var nameDisp = siteName.substring(0, 10);
+            var projDisp = getCurrentProjectName().substring(0, 12);
 
             var img = new Image();
             img.onload = function() {
@@ -10379,7 +10532,7 @@
                 var logoH   = Math.round(72 * scale);
                 var lineH   = Math.round(30 * scale);
                 var boxW    = Math.round(320 * scale);
-                var boxH    = pad + logoH + gap + Math.round(2 * scale) + gap + lineH + gap + lineH + gap + lineH + pad;
+                var boxH    = pad + logoH + gap + Math.round(2 * scale) + gap + lineH + gap + lineH + gap + lineH + gap + lineH + pad;
                 var margin  = Math.round(14 * scale);
                 var bx      = margin;
                 var by      = img.height - boxH - margin;
@@ -10470,6 +10623,12 @@
                 ctx.fillText(latDisp + ',  ' + lonDisp, bx + pad, ty);
                 ty += lineH + gap * 0.5;
                 ctx.fillText(dtDisplay, bx + pad, ty);
+                if (projDisp) {
+                    ty += lineH + gap * 0.5;
+                    ctx.font      = fss + 'px Arial';
+                    ctx.fillStyle = 'rgba(50,80,55,0.78)';
+                    ctx.fillText(projDisp, bx + pad, ty);
+                }
 
                 callback(canvas.toDataURL('image/jpeg', 0.92));
             };
@@ -10513,15 +10672,16 @@
             document.querySelectorAll('#' + siteId + '_photos img').forEach(function(img) { photos.push(img.src); });
 
             return {
-                siteId:     siteId,
-                siteNumber: parseInt(num) || 0,
-                siteName:   name,
-                datetime:   dt,
+                siteId:      siteId,
+                siteNumber:  parseInt(num) || 0,
+                siteName:    name,
+                projectName: getCurrentProjectName(),
+                datetime:    dt,
                 gps: { latitude: lat, longitude: lon },
-                fieldNotes: notes,
-                parameters: parameters,
-                photos:     photos,
-                savedAt:    new Date().toISOString()
+                fieldNotes:  notes,
+                parameters:  parameters,
+                photos:      photos,
+                savedAt:     new Date().toISOString()
             };
         }
 
@@ -10537,21 +10697,31 @@
             var data  = collectSiteData(siteId);
             var label = (data.siteName || 'Site_' + data.siteNumber).replace(/\s+/g, '_');
             var date  = new Date().toISOString().split('T')[0];
+            var proj  = getActiveProject();
             downloadJSON(
-                { tool: 'Green Scorpions Field Data Tool v3', exportDate: new Date().toISOString(), siteCount: 1, sites: [data] },
+                { tool: 'Green Scorpions Field Data Tool v4', exportDate: new Date().toISOString(),
+                  projectName: proj ? proj.name : '', siteCount: 1, sites: [data] },
                 'GSCP_Field_' + label + '_' + date + '.json'
             );
         }
 
         function exportAllFieldData() {
-            var cards = document.querySelectorAll('.field-site-card');
-            if (!cards.length) { alert('⚠️ No sites to export yet.'); return; }
-            var sites = collectAllFieldData();
-            var date  = new Date().toISOString().split('T')[0];
-            downloadJSON(
-                { tool: 'Green Scorpions Field Data Tool v3', exportDate: new Date().toISOString(), exportedBy: currentUser || 'unknown', siteCount: sites.length, sites: sites },
-                'GSCP_Field_AllSites_' + date + '.json'
-            );
+            // Persist current project DOM first
+            var cur = getActiveProject();
+            if (cur) { cur.sites = collectAllFieldData(); cur.counter = fieldSiteCounter; }
+            var allProjects = fieldProjectsData.projects;
+            var total = allProjects.reduce(function(n,p){ return n + (p.sites ? p.sites.length : 0); }, 0);
+            if (!total) { alert('No sites in any project yet.'); return; }
+            var date = new Date().toISOString().split('T')[0];
+            downloadJSON({
+                tool: 'Green Scorpions Field Data Tool v4',
+                exportDate: new Date().toISOString(),
+                exportedBy: currentUser || 'unknown',
+                projectCount: allProjects.length,
+                projects: allProjects.map(function(p) {
+                    return { id: p.id, name: p.name, created: p.created, siteCount: (p.sites||[]).length, sites: p.sites || [] };
+                })
+            }, 'GSCP_AllProjects_' + date + '.json');
         }
 
         function downloadJSON(data, filename) {
@@ -10580,11 +10750,15 @@
         }
 
         function clearAllFieldData() {
-            if (!confirm('⚠️ Clear ALL sites and the saved session? This cannot be undone.')) return;
-            localStorage.removeItem(FIELD_STORAGE_KEY);
+            var proj = getActiveProject();
+            var pname = proj ? '"' + proj.name + '"' : 'this project';
+            if (!confirm('Clear all sites in ' + pname + '? This cannot be undone.')) return;
+            if (proj) { proj.sites = []; proj.counter = 0; proj.savedAt = new Date().toISOString(); }
+            localStorage.setItem(FIELD_STORAGE_KEY, JSON.stringify(fieldProjectsData));
             fieldSiteCounter = 0;
-            document.getElementById('fieldSitesContainer').innerHTML = '<div id="fieldEmptyState" style="text-align: center; padding: 50px 20px; color: #aaa;"><div style="font-size: 3.2rem; margin-bottom: 14px;">🗺️</div><h3 style="font-size: 1.1rem; color: #888; margin-bottom: 6px;">No sites yet</h3><p style="font-size: 0.88rem;">Tap <strong>Add New Site</strong> to begin collecting field data</p></div>';
+            document.getElementById('fieldSitesContainer').innerHTML = '<div id="fieldEmptyState" style="text-align:center;padding:50px 20px;color:#aaa;"><div style="font-size:3.2rem;margin-bottom:14px;">🗺️</div><h3 style="font-size:1.1rem;color:#888;margin-bottom:6px;">No sites yet</h3><p style="font-size:0.88rem;">Tap <strong>Add New Site</strong> to begin collecting field data</p></div>';
             updateFieldSiteCount();
+            renderFieldProjectSelector();
         }
 
         function restoreFieldSession() {
@@ -10721,8 +10895,16 @@
             document.getElementById('reviewContent').style.display = 'block';
             var exportDate = reviewData.exportDate ? new Date(reviewData.exportDate).toLocaleDateString('en-ZA') : '';
             var by = reviewData.exportedBy ? ' by ' + reviewData.exportedBy : '';
-            document.getElementById('reviewSummary').textContent =
-                sites.length + ' site(s) loaded' + (exportDate ? ' — exported ' + exportDate + by : '');
+            var projName = reviewData.projectName || '';
+            var summaryHtml = '<span>' + sites.length + ' site(s) loaded' + (exportDate ? ' — exported ' + exportDate + by : '') + '</span>';
+            if (projName) {
+                summaryHtml += '<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+                    + '<label style="font-size:0.82rem;font-weight:700;color:#1a3c2a;">Project name:</label>'
+                    + '<input type="text" id="reviewProjNameInput" value="' + projName.replace(/"/g,'&quot;') + '" maxlength="60" style="padding:6px 10px;border:2px solid #aed6f1;border-radius:8px;font-size:0.9rem;min-width:180px;">'
+                    + '<button onclick="reviewRenameProject()" style="padding:6px 14px;background:#1a3c2a;color:white;border:none;border-radius:8px;font-size:0.83rem;font-weight:700;cursor:pointer;">Rename &amp; Re-download</button>'
+                    + '</div>';
+            }
+            document.getElementById('reviewSummary').innerHTML = summaryHtml;
 
             var container = document.getElementById('reviewSiteCards');
             container.innerHTML = '';
@@ -10791,6 +10973,18 @@
             document.getElementById('reviewUploadStatus').textContent = '';
             document.getElementById('reviewFileInput').value = '';
             document.getElementById('reviewSiteCards').innerHTML = '';
+        }
+
+        function reviewRenameProject() {
+            var inp = document.getElementById('reviewProjNameInput');
+            if (!inp || !reviewData) return;
+            var newName = inp.value.trim();
+            if (!newName) { alert('Please enter a project name.'); return; }
+            reviewData.projectName = newName;
+            // Re-download the updated JSON
+            var date = new Date().toISOString().split('T')[0];
+            downloadJSON(reviewData, 'GSCP_' + newName.replace(/[^a-zA-Z0-9]/g,'_') + '_renamed_' + date + '.json');
+            alert('Renamed to "' + newName + '" — updated JSON downloaded. Re-upload to continue working with the new name.');
         }
 
         // ── DOCX EXPORT ─────────────────────────────────────────────────────
