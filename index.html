@@ -10331,8 +10331,10 @@
         }
 
         function captureGPS(siteId) {
-            var btn = document.getElementById(siteId + '_gpsBtn');
-            var acc = document.getElementById(siteId + '_gpsAccuracy');
+            var btn  = document.getElementById(siteId + '_gpsBtn');
+            var acc  = document.getElementById(siteId + '_gpsAccuracy');
+            var INSTANT_M = 4;     // accept immediately if accuracy <= this
+            var WINDOW_MS = 20000; // total watch window in ms
 
             if (!navigator.geolocation) {
                 acc.textContent = '❌ Geolocation not supported by this browser.';
@@ -10340,51 +10342,126 @@
                 return;
             }
 
-            btn.textContent   = '⏳ Acquiring GPS…';
+            // Prevent double-tap
+            if (btn.getAttribute('data-gps-active') === '1') return;
+            btn.setAttribute('data-gps-active', '1');
+
+            var bestFix    = null;  // { lat, lon, accuracy }
+            var watchId    = null;
+            var timerStart = Date.now();
+            var countdown  = null;
+            var accepted   = false;
+
             btn.disabled      = true;
-            btn.style.opacity = '0.7';
-            acc.textContent   = 'Searching for signal — please wait…';
-            acc.style.color   = '#2471a3';
+            btn.style.opacity = '0.75';
+            btn.textContent   = '⏳ Acquiring GPS…';
+            acc.innerHTML     = '<span style="color:#2471a3;">Searching for signal…</span>';
 
-            navigator.geolocation.getCurrentPosition(
-                function(pos) {
-                    var lat   = pos.coords.latitude.toFixed(6);
-                    var lon   = pos.coords.longitude.toFixed(6);
-                    var acc_m = Math.round(pos.coords.accuracy);
+            function applyFix(fix) {
+                accepted = true;
+                if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+                clearInterval(countdown);
+                btn.removeAttribute('data-gps-active');
 
-                    document.getElementById(siteId + '_lat').value  = lat;
-                    document.getElementById(siteId + '_long').value = lon;
+                document.getElementById(siteId + '_lat').value  = fix.lat;
+                document.getElementById(siteId + '_long').value = fix.lon;
 
-                    btn.textContent      = '✅ Location Captured';
-                    btn.style.background = 'linear-gradient(135deg, #1e8449, #145a32)';
-                    btn.disabled         = false;
-                    btn.style.opacity    = '1';
+                var qual = fix.accuracy <= 4  ? '🟢'
+                         : fix.accuracy <= 10 ? '🟡'
+                         : fix.accuracy <= 25 ? '🟠' : '🔴';
+                acc.innerHTML   = '📍 <strong>' + fix.lat + ', ' + fix.lon + '</strong>'
+                                + ' &nbsp;·&nbsp; Accuracy: ±' + Math.round(fix.accuracy) + ' m ' + qual;
+                acc.style.color = fix.accuracy <= 10 ? '#1e8449' : fix.accuracy <= 25 ? '#d35400' : '#c0392b';
 
-                    acc.innerHTML   = '📍 <strong>' + lat + ', ' + lon + '</strong> &nbsp;·&nbsp; Accuracy: ±' + acc_m + ' m';
-                    acc.style.color = '#1e8449';
+                btn.textContent      = '✅ GPS Fixed  ±' + Math.round(fix.accuracy) + ' m';
+                btn.style.background = 'linear-gradient(135deg, #1e8449, #145a32)';
+                btn.disabled         = false;
+                btn.style.opacity    = '1';
 
-                    updateSiteHeader(siteId);
-                    fieldAutoSave();
+                updateSiteHeader(siteId);
+                fieldAutoSave();
 
-                    setTimeout(function() {
-                        btn.textContent      = '📍 Get My Location';
-                        btn.style.background = 'linear-gradient(135deg, #27ae60, #1e8449)';
-                    }, 5000);
-                },
-                function(err) {
-                    btn.textContent   = '📍 Get My Location';
-                    btn.disabled      = false;
-                    btn.style.opacity = '1';
-                    var msgs = {
-                        1: 'Permission denied — allow location access in your browser/phone settings.',
-                        2: 'GPS signal unavailable. Move to an open area and try again.',
-                        3: 'GPS timed out. Try again or enter coordinates manually.'
-                    };
-                    acc.textContent = '❌ ' + (msgs[err.code] || 'GPS error. Enter coordinates manually.');
-                    acc.style.color = '#c0392b';
-                },
-                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-            );
+                setTimeout(function() {
+                    btn.textContent      = '📍 Get My Location';
+                    btn.style.background = 'linear-gradient(135deg, #27ae60, #1e8449)';
+                }, 6000);
+            }
+
+            function onPosition(pos) {
+                if (accepted) return;
+                var fix = {
+                    lat:      pos.coords.latitude.toFixed(6),
+                    lon:      pos.coords.longitude.toFixed(6),
+                    accuracy: pos.coords.accuracy
+                };
+                // Always keep the best (lowest accuracy radius) fix seen so far
+                if (!bestFix || fix.accuracy < bestFix.accuracy) {
+                    bestFix = fix;
+                    var elapsed   = Math.round((Date.now() - timerStart) / 1000);
+                    var remaining = Math.max(0, Math.round((WINDOW_MS - (Date.now() - timerStart)) / 1000));
+                    acc.innerHTML = '⏱ Refining… ±' + Math.round(fix.accuracy) + ' m'
+                                  + '&nbsp;&nbsp;<span style="font-size:0.78rem;color:#888;">'
+                                  + remaining + ' s remaining'
+                                  + ' &nbsp;·&nbsp; <a href="#" onclick="gpsTakeNow_' + siteId.replace(/-/g,'') + '(); return false;" '
+                                  + 'style="color:#2471a3;font-weight:700;">Use now</a></span>';
+                    acc.style.color = '#2471a3';
+                }
+                // Instant-accept if accuracy is good enough
+                if (fix.accuracy <= INSTANT_M) {
+                    applyFix(fix);
+                }
+            }
+
+            function onError(err) {
+                if (accepted) return;
+                navigator.geolocation.clearWatch(watchId);
+                clearInterval(countdown);
+                btn.removeAttribute('data-gps-active');
+                btn.textContent   = '📍 Get My Location';
+                btn.disabled      = false;
+                btn.style.opacity = '1';
+                var msgs = {
+                    1: 'Permission denied — allow location access in your browser/phone settings.',
+                    2: 'GPS signal unavailable. Move to an open area and try again.',
+                    3: 'GPS timed out. Try again or enter coordinates manually.'
+                };
+                acc.textContent = '❌ ' + (msgs[err.code] || 'GPS error. Enter coordinates manually.');
+                acc.style.color = '#c0392b';
+            }
+
+            // "Use now" link calls this
+            window['gpsTakeNow_' + siteId.replace(/-/g,'')] = function() {
+                if (bestFix && !accepted) applyFix(bestFix);
+            };
+
+            // Countdown ticker — updates every second
+            countdown = setInterval(function() {
+                if (accepted) { clearInterval(countdown); return; }
+                var remaining = Math.max(0, Math.round((WINDOW_MS - (Date.now() - timerStart)) / 1000));
+                var pct = Math.round(((WINDOW_MS - remaining * 1000) / WINDOW_MS) * 100);
+                btn.textContent = '⏳ Searching… ' + remaining + 's';
+
+                if (remaining === 0) {
+                    clearInterval(countdown);
+                    if (!accepted) {
+                        if (bestFix) {
+                            applyFix(bestFix);
+                        } else {
+                            // No fix received at all
+                            navigator.geolocation.clearWatch(watchId);
+                            btn.removeAttribute('data-gps-active');
+                            btn.textContent   = '📍 Get My Location';
+                            btn.disabled      = false;
+                            btn.style.opacity = '1';
+                            acc.textContent   = '❌ No GPS fix after 20 s. Move to an open area and try again.';
+                            acc.style.color   = '#c0392b';
+                        }
+                    }
+                }
+            }, 1000);
+
+            watchId = navigator.geolocation.watchPosition(onPosition, onError,
+                { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 });
         }
 
         function toggleParamPill(siteId, key) {
